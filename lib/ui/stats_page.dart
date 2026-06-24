@@ -25,7 +25,6 @@ class StatsPage extends ConsumerWidget {
     final recordCount = records.length;
     final people = personLedgerSummaries(records);
     final byRelationship = totalsByRelationship(records);
-    final byEvent = totalsByEventType(records);
     final byMonth = monthlySummaries(records);
 
     final topPeople = [...people]
@@ -34,8 +33,6 @@ class StatsPage extends ConsumerWidget {
       ..sort((a, b) => b.value.compareTo(a.value));
     final monthEntries = byMonth.entries.toList()
       ..sort((a, b) => b.key.compareTo(a.key));
-    final eventEntries = byEvent.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
 
     final monthHint = monthEntries.isEmpty
         ? '아직 기록된 인연이 없어요'
@@ -50,7 +47,7 @@ class StatsPage extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '행사 종류별 금액은 보조 정보로 두고, 먼저 돈의 흐름이 보이게 정리했어요.',
+          '행사 종류별 금액은 제외하고, 먼저 돈의 흐름이 보이게 정리했어요.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 16),
@@ -105,6 +102,7 @@ class StatsPage extends ConsumerWidget {
               trailingLines: [
                 '준 금액  ${formatWon(summary.given)}',
                 '받은 금액 ${formatWon(summary.received)}',
+                '보낸 ${summary.givenCount}건 · 받은 ${summary.receivedCount}건',
                 '최근 행사  ${summary.lastEventLabel}',
               ],
             ),
@@ -137,24 +135,6 @@ class StatsPage extends ConsumerWidget {
                   .clamp(1, 1 << 31),
             ),
           ),
-        const SizedBox(height: 20),
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          title: const Text('보조 보기: 행사 종류별 금액'),
-          subtitle: const Text('필요할 때만 펼쳐서 확인해요'),
-          childrenPadding: const EdgeInsets.only(top: 8),
-          children: [
-            if (eventEntries.isEmpty)
-              const EmptyStateCard(message: '아직 기록된 인연이 없어요')
-            else
-              ...eventEntries.map(
-                (entry) => _MetricRow(
-                  label: entry.key,
-                  value: formatWon(entry.value),
-                ),
-              ),
-          ],
-        ),
       ],
     );
   }
@@ -384,31 +364,6 @@ class _TinyBar extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _MetricRow extends StatelessWidget {
-  const _MetricRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(child: Text(label)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
-        ],
-      ),
     );
   }
 }

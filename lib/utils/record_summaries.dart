@@ -10,6 +10,8 @@ class PersonLedgerSummary {
     required this.relationship,
     required this.given,
     required this.received,
+    required this.givenCount,
+    required this.receivedCount,
     required this.recordCount,
     required this.lastRecordDate,
     required this.lastEventLabel,
@@ -20,6 +22,8 @@ class PersonLedgerSummary {
   final String relationship;
   final int given;
   final int received;
+  final int givenCount;
+  final int receivedCount;
   final int recordCount;
   final DateTime lastRecordDate;
   final String lastEventLabel;
@@ -114,6 +118,8 @@ List<PersonLedgerSummary> personLedgerSummaries(
       relationship: record.relationship,
       given: (existing?.given ?? 0) + (isGiven ? record.amount : 0),
       received: (existing?.received ?? 0) + (isGiven ? 0 : record.amount),
+      givenCount: (existing?.givenCount ?? 0) + (isGiven ? 1 : 0),
+      receivedCount: (existing?.receivedCount ?? 0) + (isGiven ? 0 : 1),
       recordCount: (existing?.recordCount ?? 0) + 1,
       lastRecordDate:
           existing == null || record.date.isAfter(existing.lastRecordDate)

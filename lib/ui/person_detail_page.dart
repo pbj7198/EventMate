@@ -34,6 +34,12 @@ class PersonDetailPage extends ConsumerWidget {
       records,
       transactionType: TransactionType.received,
     );
+    final givenCount = records
+        .where((record) => record.transactionType == TransactionType.given)
+        .length;
+    final receivedCount = records
+        .where((record) => record.transactionType == TransactionType.received)
+        .length;
 
     return Scaffold(
       appBar: AppBar(title: const Text('인연 상세')),
@@ -85,11 +91,13 @@ class PersonDetailPage extends ConsumerWidget {
                 title: '내가 준 금액',
                 value: formatWon(given),
                 icon: Icons.payments_outlined,
+                subtitle: '$givenCount건',
               ),
               SummaryCard(
                 title: '내가 받은 금액',
                 value: formatWon(received),
                 icon: Icons.savings_outlined,
+                subtitle: '$receivedCount건',
               ),
             ],
           ),

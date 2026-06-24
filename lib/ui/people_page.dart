@@ -7,9 +7,7 @@ import 'common_widgets.dart';
 import 'person_detail_page.dart';
 
 class PeoplePage extends ConsumerStatefulWidget {
-  const PeoplePage({super.key, required this.onAddRecord});
-
-  final VoidCallback onAddRecord;
+  const PeoplePage({super.key});
 
   @override
   ConsumerState<PeoplePage> createState() => _PeoplePageState();
@@ -28,7 +26,8 @@ class _PeoplePageState extends ConsumerState<PeoplePage> {
       final q = _query.toLowerCase();
       return person.name.toLowerCase().contains(q) ||
           person.relationship.toLowerCase().contains(q);
-    }).toList()..sort((a, b) => a.name.compareTo(b.name));
+    }).toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
@@ -41,11 +40,7 @@ class _PeoplePageState extends ConsumerState<PeoplePage> {
           onChanged: (value) => setState(() => _query = value),
         ),
         const SizedBox(height: 16),
-        SectionHeader(
-          title: '인연 목록',
-          actionLabel: '기록 추가',
-          onActionTap: widget.onAddRecord,
-        ),
+        const SectionHeader(title: '인연 목록'),
         if (people.isEmpty)
           const EmptyStateCard(message: '아직 기록된 인연이 없어요')
         else

@@ -93,17 +93,7 @@ class PersonDetailPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 20),
-          SectionHeader(
-            title: '관련 경조사 기록',
-            actionLabel: '추가',
-            onActionTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => RecordFormPage(initialPersonId: person.id),
-                ),
-              );
-            },
-          ),
+          const SectionHeader(title: '관련 경조사 기록'),
           if (records.isEmpty)
             const EmptyStateCard(message: '이 사람과 연결된 기록이 아직 없어요.')
           else

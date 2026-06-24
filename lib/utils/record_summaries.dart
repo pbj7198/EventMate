@@ -10,7 +10,9 @@ class PersonLedgerSummary {
     required this.relationship,
     required this.given,
     required this.received,
+    required this.recordCount,
     required this.lastRecordDate,
+    required this.lastEventType,
   });
 
   final String personId;
@@ -18,10 +20,11 @@ class PersonLedgerSummary {
   final String relationship;
   final int given;
   final int received;
+  final int recordCount;
   final DateTime lastRecordDate;
+  final EventType lastEventType;
 
   int get net => received - given;
-  int get activityCount => given == 0 && received == 0 ? 0 : 1;
 }
 
 class MonthlySummary {
@@ -110,10 +113,15 @@ List<PersonLedgerSummary> personLedgerSummaries(
       relationship: record.relationship,
       given: (existing?.given ?? 0) + (isGiven ? record.amount : 0),
       received: (existing?.received ?? 0) + (isGiven ? 0 : record.amount),
+      recordCount: (existing?.recordCount ?? 0) + 1,
       lastRecordDate:
           existing == null || record.date.isAfter(existing.lastRecordDate)
           ? record.date
           : existing.lastRecordDate,
+      lastEventType:
+          existing == null || record.date.isAfter(existing.lastRecordDate)
+          ? record.eventType
+          : existing.lastEventType,
     );
   }
   final list = result.values.toList();

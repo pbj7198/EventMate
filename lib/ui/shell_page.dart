@@ -25,8 +25,8 @@ class _ShellPageState extends State<ShellPage> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      HomePage(onAddRecord: _openAddRecord),
-      LedgerPage(onAddRecord: _openAddRecord),
+      const HomePage(),
+      const LedgerPage(),
       const StatsPage(),
     ];
 
@@ -44,11 +44,6 @@ class _ShellPageState extends State<ShellPage> {
         ],
       ),
       body: IndexedStack(index: _index, children: pages),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddRecord,
-        icon: const Icon(Icons.note_add_outlined),
-        label: const Text('기록 추가'),
-      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (index) => setState(() => _index = index),

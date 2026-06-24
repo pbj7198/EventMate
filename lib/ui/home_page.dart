@@ -1,4 +1,4 @@
-// Minimal home dashboard focused on today's quick context and fast actions.
+// Minimal home dashboard focused on quick context and recent activity.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,9 +10,7 @@ import 'common_widgets.dart';
 import 'record_form_page.dart';
 
 class HomePage extends ConsumerWidget {
-  const HomePage({super.key, required this.onAddRecord});
-
-  final VoidCallback onAddRecord;
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,8 +29,7 @@ class HomePage extends ConsumerWidget {
       state.records,
       transactionType: TransactionType.received,
     );
-    final recentRecords = [...state.records]
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final recentRecords = [...state.records]..sort((a, b) => b.date.compareTo(a.date));
 
     return RefreshIndicator(
       onRefresh: () => ref.read(inyeonControllerProvider.notifier).load(),
@@ -66,17 +63,6 @@ class HomePage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 16),
-          SectionHeader(
-            title: '빠른 기록',
-            actionLabel: '추가',
-            onActionTap: onAddRecord,
-          ),
-          FilledButton.icon(
-            onPressed: onAddRecord,
-            icon: const Icon(Icons.add),
-            label: const Text('경조사 기록 추가'),
-          ),
-          const SizedBox(height: 20),
           const SectionHeader(title: '이번 달 경조사'),
           if (monthRecords.isEmpty)
             const EmptyStateCard(message: '아직 기록된 인연이 없어요')
@@ -84,11 +70,21 @@ class HomePage extends ConsumerWidget {
             ...monthRecords.take(3).map(
               (record) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: RecordTile(record: record, compact: true),
+                child: RecordTile(
+                  record: record,
+                  compact: true,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => RecordFormPage(initialRecord: record),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           const SizedBox(height: 8),
-          SectionHeader(title: '최근 기록'),
+          const SectionHeader(title: '최근 기록'),
           if (recentRecords.isEmpty)
             const EmptyStateCard(message: '아직 기록된 인연이 없어요')
           else

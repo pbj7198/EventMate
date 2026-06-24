@@ -1,6 +1,7 @@
 // Bottom navigation shell that keeps the app focused on summary, ledger, and stats.
 import 'package:flutter/material.dart';
 
+import 'calendar_page.dart';
 import 'home_page.dart';
 import 'ledger_page.dart';
 import 'record_form_page.dart';
@@ -26,11 +27,12 @@ class _ShellPageState extends State<ShellPage> {
   Widget build(BuildContext context) {
     final pages = <Widget>[
       const HomePage(),
+      const CalendarPage(),
       const LedgerPage(),
       const StatsPage(),
     ];
 
-    final titles = ['홈', '장부', '통계'];
+    final titles = ['홈', '달력', '장부', '통계'];
 
     return Scaffold(
       appBar: AppBar(
@@ -52,6 +54,11 @@ class _ShellPageState extends State<ShellPage> {
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: '홈',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: '달력',
           ),
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),

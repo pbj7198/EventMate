@@ -1,7 +1,8 @@
-// OCR service for sign-in sheets and other photographed name lists.
+// OCR service for photographed sheets, posters, and other text-heavy images.
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image/image.dart' as image;
 import 'package:image_picker/image_picker.dart';
 
 import '../models/person_import_draft.dart';
@@ -30,13 +31,13 @@ class SignatureSheetScanException implements Exception {
   String toString() => message;
 }
 
-class MlKitSignatureSheetScanService implements SignatureSheetScanService {
-  MlKitSignatureSheetScanService({
+class TesseractSignatureSheetScanService implements SignatureSheetScanService {
+  TesseractSignatureSheetScanService({
     ImagePicker? imagePicker,
     MethodChannel? ocrChannel,
-  }) : _imagePicker = imagePicker ?? ImagePicker(),
-       _ocrChannel =
-           ocrChannel ?? const MethodChannel('com.qkrqu.inyeon_jangbu/ocr');
+  })  : _imagePicker = imagePicker ?? ImagePicker(),
+        _ocrChannel =
+            ocrChannel ?? const MethodChannel('com.qkrqu.inyeon_jangbu/ocr');
 
   final ImagePicker _imagePicker;
   final MethodChannel _ocrChannel;
@@ -45,27 +46,41 @@ class MlKitSignatureSheetScanService implements SignatureSheetScanService {
   Future<SignatureSheetScanResult?> scanFromCamera() async {
     final file = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 85,
-      maxWidth: 2400,
-      maxHeight: 2400,
+      imageQuality: 92,
+      maxWidth: 3000,
+      maxHeight: 3000,
     );
     if (file == null) {
       return null;
     }
 
-    final normalizedImage = await _normalizePickedImage(file);
-    final recognizedText = await _recognizeText(normalizedImage);
+    final tessDataPath = await _ensureTessDataPath();
+    final recognizedText = await _recognizeText(
+      file.path,
+      tessDataPath: tessDataPath,
+    );
     return SignatureSheetScanResult(
       rawText: recognizedText,
       candidates: extractPersonImportDrafts(recognizedText),
     );
   }
 
-  Future<String> _recognizeText(NormalizedOcrImage image) async {
+  Future<String> _recognizeText(
+    String imagePath, {
+    required String tessDataPath,
+  }) async {
     try {
       final recognizedText = await _ocrChannel.invokeMethod<String>(
         'recognizeText',
-        <String, Object>{'bytes': image.jpegBytes},
+        <String, Object>{
+          'imagePath': imagePath,
+          'tessDataPath': tessDataPath,
+          'language': 'kor+eng',
+          'args': <String, String>{
+            'psm': '6',
+            'preserve_interword_spaces': '1',
+          },
+        },
       );
       return recognizedText?.trim() ?? '';
     } on PlatformException catch (error) {
@@ -73,72 +88,52 @@ class MlKitSignatureSheetScanService implements SignatureSheetScanService {
         '사진의 글자를 읽지 못했어요. 잠시 후 다시 시도해 주세요.',
         error,
       );
-    }
-  }
-
-  Future<NormalizedOcrImage> _normalizePickedImage(XFile file) async {
-    try {
-      return normalizeOcrImageBytes(await file.readAsBytes());
     } catch (error) {
       throw SignatureSheetScanException(
-        '촬영한 사진을 읽지 못했어요. 카메라를 다시 열어 촬영해 주세요.',
+        '사진의 글자를 읽지 못했어요. 잠시 후 다시 시도해 주세요.',
         error,
       );
     }
   }
 }
 
-class NormalizedOcrImage {
-  const NormalizedOcrImage({
-    required this.jpegBytes,
-    required this.width,
-    required this.height,
-  });
+Future<String>? _tessDataPathFuture;
 
-  final Uint8List jpegBytes;
-  final int width;
-  final int height;
+Future<String> _ensureTessDataPath() {
+  return _tessDataPathFuture ??= _copyTessDataToTempDir();
 }
 
-NormalizedOcrImage normalizeOcrImageBytes(
-  Uint8List bytes, {
-  int maxDimension = 1600,
-}) {
-  image.Image? decoded;
-  try {
-    decoded = image.decodeImage(bytes);
-  } catch (error) {
-    throw FormatException('Unsupported image data', error);
-  }
-  if (decoded == null) {
-    throw const FormatException('Unsupported image data');
-  }
-
-  var normalized = image.bakeOrientation(decoded);
-  final longestSide = normalized.width > normalized.height
-      ? normalized.width
-      : normalized.height;
-  if (longestSide > maxDimension) {
-    if (normalized.width >= normalized.height) {
-      normalized = image.copyResize(normalized, width: maxDimension);
-    } else {
-      normalized = image.copyResize(normalized, height: maxDimension);
-    }
-  }
-
-  // Re-encoding applies EXIF orientation and strips camera-specific metadata.
-  // Native code returns only the recognized text, avoiding fragile block data.
-  return NormalizedOcrImage(
-    jpegBytes: Uint8List.fromList(image.encodeJpg(normalized, quality: 90)),
-    width: normalized.width,
-    height: normalized.height,
+Future<String> _copyTessDataToTempDir() async {
+  final rootDir = Directory(
+    '${Directory.systemTemp.path}${Platform.pathSeparator}inyeon_jangbu_ocr',
   );
+  final tessDataDir = Directory(
+    '${rootDir.path}${Platform.pathSeparator}tessdata',
+  );
+
+  if (!await tessDataDir.exists()) {
+    await tessDataDir.create(recursive: true);
+  }
+
+  for (final assetName in const ['eng.traineddata', 'kor.traineddata']) {
+    final target = File(
+      '${tessDataDir.path}${Platform.pathSeparator}$assetName',
+    );
+    if (await target.exists()) {
+      continue;
+    }
+
+    final data = await rootBundle.load('assets/tessdata/$assetName');
+    await target.writeAsBytes(data.buffer.asUint8List(), flush: true);
+  }
+
+  return rootDir.path;
 }
 
 final signatureSheetScanServiceProvider = Provider<SignatureSheetScanService>((
   ref,
 ) {
-  return MlKitSignatureSheetScanService();
+  return TesseractSignatureSheetScanService();
 });
 
 List<PersonImportDraft> extractPersonImportDrafts(String rawText) {
@@ -166,36 +161,6 @@ List<PersonImportDraft> extractPersonImportDrafts(String rawText) {
 
 final _phonePattern = RegExp(r'(01[016789][-\s]?\d{3,4}[-\s]?\d{4})');
 
-final _stopWords = <String>{
-  '서명',
-  '성명',
-  '이름',
-  '명단',
-  '축의',
-  '축하',
-  '조의',
-  '관계',
-  '메모',
-  '비고',
-  '직책',
-  '회사',
-  '가족',
-  '친척',
-  '친구',
-  '지인',
-  '기타',
-  '신랑',
-  '신부',
-  '총무',
-  '참석',
-  '감사',
-  '환영',
-  '일시',
-  '장소',
-  '연락',
-  '전화',
-};
-
 String? _extractPhoneNumber(String line) {
   final match = _phonePattern.firstMatch(line);
   if (match == null) {
@@ -206,62 +171,88 @@ String? _extractPhoneNumber(String line) {
 
 List<PersonImportDraft> _extractNamesFromLine(String line, String? phone) {
   final normalized = line.replaceAll(_phonePattern, ' ');
-  final tokens = normalized.split(RegExp(r'[\s,·•/|]+'));
-  final koreanTokens = tokens
-      .map((token) => token.replaceAll(RegExp(r'[^가-힣]'), ''))
-      .where((token) => token.isNotEmpty)
-      .toList();
+  final tokens = normalized.split(RegExp(r'[\s,·•|/:]+'));
+
+  final names = <String>{};
+  for (final token in tokens) {
+    final compact = token.replaceAll(RegExp(r'[^가-힣]'), '');
+    if (_looksLikeKoreanName(compact)) {
+      names.add(compact);
+    }
+  }
+
+  if (names.isEmpty) {
+    return const [];
+  }
+
   final hasListContext =
       phone != null ||
-      koreanTokens.length == 1 ||
-      koreanTokens.any(_stopWords.contains);
+      names.length == 1 ||
+      normalized.contains(RegExp(r'[:·•|/]'));
   if (!hasListContext) {
     return const [];
   }
 
-  final candidates = <PersonImportDraft>[];
-
-  void addCandidate(String value) {
-    final name = value.trim();
-    if (name.isEmpty) {
-      return;
-    }
-    if (!_looksLikeKoreanName(name)) {
-      return;
-    }
-    if (_stopWords.contains(name)) {
-      return;
-    }
-    candidates.add(
-      PersonImportDraft(name: name, phoneNumber: phone, sourceLine: line),
-    );
-  }
-
-  for (final token in tokens) {
-    final compact = token.replaceAll(RegExp(r'[^가-힣]'), '');
-    if (compact.length >= 2 && compact.length <= 4) {
-      addCandidate(compact);
-    }
-  }
-
-  final compactLine = normalized.replaceAll(RegExp(r'[^가-힣]'), '');
-  if (compactLine.length >= 2 && compactLine.length <= 4) {
-    addCandidate(compactLine);
-  }
-
-  return candidates;
+  return names
+      .map(
+        (name) => PersonImportDraft(
+          name: name,
+          phoneNumber: phone,
+          sourceLine: line,
+        ),
+      )
+      .toList();
 }
 
 bool _looksLikeKoreanName(String value) {
-  final text = value.replaceAll(' ', '');
-  if (!RegExp(r'^[가-힣]{2,4}$').hasMatch(text)) {
+  if (!RegExp(r'^[가-힣]{2,4}$').hasMatch(value)) {
     return false;
   }
 
-  return _koreanSurnames.any(text.startsWith);
+  if (_noiseWords.contains(value)) {
+    return false;
+  }
+
+  return _koreanSurnamePrefixes.any(value.startsWith);
 }
 
-const _koreanSurnames = <String>{
+const _noiseWords = <String>{
+  '이름',
+  '성함',
+  '명단',
+  '전화',
+  '연락처',
+  '번호',
+  '관계',
+  '가족',
+  '친구',
+  '회사',
+  '지인',
+  '친척',
+  '기타',
+  '메모',
+  '예식',
+  '장례',
+  '돌잔치',
+  '생일',
+  '개업',
+  '감사',
+  '참석',
+  '대기',
+  '초기화',
+  '추출',
+  '사진',
+  '글자',
+  '스캔',
+  '현재',
+  '상태',
+  '조회수',
+  '유튜브',
+  '아직',
+  '없어요',
+};
+
+const _koreanSurnamePrefixes = <String>{
   '김',
   '이',
   '박',
@@ -280,9 +271,9 @@ const _koreanSurnames = <String>{
   '황',
   '안',
   '송',
-  '전',
-  '홍',
   '유',
+  '홍',
+  '전',
   '고',
   '문',
   '양',
@@ -311,60 +302,35 @@ const _koreanSurnames = <String>{
   '공',
   '현',
   '함',
-  '변',
   '염',
-  '여',
-  '추',
-  '도',
-  '소',
-  '석',
-  '선',
-  '설',
-  '마',
-  '길',
-  '연',
   '위',
   '표',
-  '명',
   '기',
-  '반',
-  '왕',
-  '금',
-  '옥',
-  '육',
-  '인',
-  '맹',
-  '제',
-  '모',
-  '탁',
-  '국',
-  '어',
-  '은',
-  '편',
-  '용',
-  '예',
-  '경',
-  '봉',
-  '사',
-  '부',
-  '가',
-  '복',
-  '태',
+  '길',
   '목',
   '형',
-  '두',
-  '감',
-  '음',
-  '빈',
-  '동',
-  '온',
-  '호',
+  '국',
+  '맹',
+  '예',
+  '도',
+  '연',
+  '석',
+  '변',
+  '여',
+  '추',
+  '소',
+  '설',
+  '선',
+  '별',
+  '미',
+  '마',
   '남궁',
-  '황보',
-  '제갈',
-  '사공',
   '선우',
+  '제갈',
+  '황보',
+  '사공',
   '서문',
-  '독고',
   '동방',
+  '어금',
+  '독고',
 };

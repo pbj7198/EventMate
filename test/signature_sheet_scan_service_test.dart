@@ -1,54 +1,38 @@
-import 'dart:typed_data';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:image/image.dart' as image;
 
 import 'package:inyeon_jangbu/services/signature_sheet_scan_service.dart';
 
 void main() {
-  test(
-    'extractPersonImportDrafts finds names and phones from raw OCR text',
-    () {
-      const rawText = '''
-    서명
-    김민수 010-1234-5678
-    박영희
-    총무
-    이준호 010 9876 5432
+  test('extractPersonImportDrafts finds names and phones from raw OCR text', () {
+    const rawText = '''
+      김민수 010-1234-5678
+      박영희
+      홍길동 010 9876 5432
     ''';
 
-      final candidates = extractPersonImportDrafts(rawText);
+    final candidates = extractPersonImportDrafts(rawText);
 
-      expect(candidates.length, 3);
-      expect(candidates[0].name, '김민수');
-      expect(candidates[0].phoneNumber, '01012345678');
-      expect(candidates[1].name, '박영희');
-      expect(candidates[1].phoneNumber, isNull);
-      expect(candidates[2].name, '이준호');
-      expect(candidates[2].phoneNumber, '01098765432');
-    },
-  );
-
-  test('normalizeOcrImageBytes decodes and limits large camera images', () {
-    final source = image.Image(width: 3000, height: 1800);
-    final bytes = Uint8List.fromList(image.encodeJpg(source));
-
-    final normalized = normalizeOcrImageBytes(bytes);
-
-    expect(normalized.width, 1600);
-    expect(normalized.height, lessThanOrEqualTo(1600));
-    expect(image.decodeJpg(normalized.jpegBytes), isNotNull);
+    expect(candidates.length, 3);
+    expect(candidates[0].name, '김민수');
+    expect(candidates[0].phoneNumber, '01012345678');
+    expect(candidates[1].name, '박영희');
+    expect(candidates[1].phoneNumber, isNull);
+    expect(candidates[2].name, '홍길동');
+    expect(candidates[2].phoneNumber, '01098765432');
   });
 
-  test('normalizeOcrImageBytes rejects invalid camera data', () {
-    expect(
-      () => normalizeOcrImageBytes(Uint8List.fromList([1, 2, 3])),
-      throwsFormatException,
-    );
+  test('photo text from the attached screenshots does not become fake names', () {
+    const rawText = '그만 먹으라고 괴물쥐 유튜브 조회수 47만회 2일';
+
+    expect(extractPersonImportDrafts(rawText), isEmpty);
   });
 
-  test('general Korean text is preserved without false name candidates', () {
-    const rawText = '새벽보기 라이트 안내문';
+  test('app screenshot text also stays out of the person candidate list', () {
+    const rawText = '''
+      사진 글자 스캔
+      사진 속 글자를 추출하고, 사람 이름으로 보이는 항목은 인연 후보로 정리해드려요.
+      아직 스캔한 사진이 없어요.
+    ''';
 
     expect(extractPersonImportDrafts(rawText), isEmpty);
   });

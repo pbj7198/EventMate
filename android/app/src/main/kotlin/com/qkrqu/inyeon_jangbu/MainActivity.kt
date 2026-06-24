@@ -1,16 +1,16 @@
 package com.qkrqu.inyeon_jangbu
 
-import android.graphics.BitmapFactory
+import android.os.Handler
+import android.os.Looper
+import com.googlecode.tesseract.android.TessBaseAPI
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import java.io.File
 
 class MainActivity : FlutterActivity() {
     private val ocrChannel = "com.qkrqu.inyeon_jangbu/ocr"
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -22,59 +22,79 @@ class MainActivity : FlutterActivity() {
                     return@setMethodCallHandler
                 }
 
-                val bytes = call.argument<ByteArray>("bytes")
-                if (bytes == null || bytes.isEmpty()) {
-                    result.error("INVALID_IMAGE", "Image bytes are empty.", null)
+                val imagePath = call.argument<String>("imagePath")
+                val tessDataPath = call.argument<String>("tessDataPath")
+                val language = call.argument<String>("language") ?: "eng"
+                val args = call.argument<Map<String, String>>("args")
+
+                if (imagePath.isNullOrBlank()) {
+                    result.error("INVALID_IMAGE", "Image path is empty.", null)
+                    return@setMethodCallHandler
+                }
+                if (tessDataPath.isNullOrBlank()) {
+                    result.error("INVALID_TESSDATA", "Tessdata path is empty.", null)
                     return@setMethodCallHandler
                 }
 
-                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                if (bitmap == null) {
-                    result.error("INVALID_IMAGE", "The image could not be decoded.", null)
-                    return@setMethodCallHandler
-                }
+                Thread {
+                    val api = TessBaseAPI()
+                    try {
+                        if (!api.init(tessDataPath, language)) {
+                            postError(
+                                result,
+                                "OCR_INIT_FAILED",
+                                "Tesseract failed to initialize.",
+                                null,
+                            )
+                            return@Thread
+                        }
 
-                recognizeText(InputImage.fromBitmap(bitmap, 0), result)
+                        var psm = TessBaseAPI.PageSegMode.PSM_AUTO_OSD
+                        args?.forEach { (key, value) ->
+                            if (key == "psm") {
+                                psm = parsePageSegMode(value)
+                            } else {
+                                api.setVariable(key, value)
+                            }
+                        }
+
+                        api.setPageSegMode(psm)
+                        api.setImage(File(imagePath))
+                        val recognizedText = api.getUTF8Text() ?: ""
+                        api.stop()
+
+                        mainHandler.post {
+                            result.success(recognizedText)
+                        }
+                    } catch (error: Exception) {
+                        postError(
+                            result,
+                            "OCR_FAILED",
+                            error.message ?: "Text recognition failed.",
+                            error.stackTraceToString(),
+                        )
+                    } finally {
+                        try {
+                            api.recycle()
+                        } catch (_: Exception) {
+                        }
+                    }
+                }.start()
             }
     }
 
-    private fun recognizeText(inputImage: InputImage, result: MethodChannel.Result) {
-        val koreanRecognizer = TextRecognition.getClient(
-            KoreanTextRecognizerOptions.Builder().build()
-        )
-
-        koreanRecognizer.process(inputImage)
-            .addOnSuccessListener { recognized ->
-                koreanRecognizer.close()
-                result.success(recognized.text)
-            }
-            .addOnFailureListener { koreanError ->
-                koreanRecognizer.close()
-                recognizeLatinText(inputImage, koreanError, result)
-            }
-    }
-
-    private fun recognizeLatinText(
-        inputImage: InputImage,
-        koreanError: Exception,
+    private fun postError(
         result: MethodChannel.Result,
+        code: String,
+        message: String,
+        details: Any?,
     ) {
-        val latinRecognizer = TextRecognition.getClient(
-            TextRecognizerOptions.DEFAULT_OPTIONS
-        )
+        mainHandler.post {
+            result.error(code, message, details)
+        }
+    }
 
-        latinRecognizer.process(inputImage)
-            .addOnSuccessListener { recognized ->
-                latinRecognizer.close()
-                result.success(recognized.text)
-            }
-            .addOnFailureListener { latinError ->
-                latinRecognizer.close()
-                result.error(
-                    "OCR_FAILED",
-                    latinError.message ?: "Text recognition failed.",
-                    "Korean: ${koreanError.message}; Latin: ${latinError.message}",
-                )
-            }
+    private fun parsePageSegMode(value: String): Int {
+        return value.toIntOrNull() ?: TessBaseAPI.PageSegMode.PSM_AUTO_OSD
     }
 }

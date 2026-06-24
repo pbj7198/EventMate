@@ -46,7 +46,7 @@ class _ShellPageState extends State<ShellPage> {
         title: Text(titles[_index]),
         actions: [
           IconButton(
-            tooltip: '명단 스캔',
+            tooltip: '사진 글자 스캔',
             onPressed: _openScanSheet,
             icon: const Icon(Icons.document_scanner_outlined),
           ),

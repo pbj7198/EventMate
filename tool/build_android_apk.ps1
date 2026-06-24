@@ -38,7 +38,14 @@ $builtApk = if ($Mode -eq 'release') {
 }
 
 $latestApk = Join-Path $artifactDir 'latest.apk'
-Copy-Item -Force $builtApk $latestApk
+try {
+  Copy-Item -Force $builtApk $latestApk
+} catch {
+  $fallbackApk = Join-Path $artifactDir ('EventMate-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.apk')
+  Write-Warning "Could not refresh latest.apk: $($_.Exception.Message)"
+  Copy-Item -Force $builtApk $fallbackApk
+  Write-Host "Fallback APK copy: $fallbackApk"
+}
 
 $origin = (git remote get-url origin).Trim()
 $repoPath = $null

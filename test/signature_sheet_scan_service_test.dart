@@ -3,37 +3,58 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inyeon_jangbu/services/signature_sheet_scan_service.dart';
 
 void main() {
-  test('extractPersonImportDrafts finds names and phones from raw OCR text', () {
-    const rawText = '''
+  test('OcrRecognitionResponse parses success and no_text states', () {
+    final success = OcrRecognitionResponse.fromMap(<Object?, Object?>{
+      'status': 'success',
+      'text': '김민수 010-1234-5678',
+      'message': 'ok',
+    });
+    expect(success.status, SignatureSheetScanStatus.success);
+    expect(success.text, '김민수 010-1234-5678');
+    expect(success.message, 'ok');
+
+    final noText = OcrRecognitionResponse.fromMap(<Object?, Object?>{
+      'status': 'no_text',
+      'text': 'ignored',
+      'message': 'nothing found',
+    });
+    expect(noText.status, SignatureSheetScanStatus.noText);
+    expect(noText.text, isEmpty);
+    expect(noText.message, 'nothing found');
+  });
+
+  test(
+    'extractPersonImportDrafts finds names and phones from raw OCR text',
+    () {
+      const rawText = '''
       김민수 010-1234-5678
-      박영희
-      홍길동 010 9876 5432
+      박영희 : 010 9876 5432
+      홍길동
     ''';
 
-    final candidates = extractPersonImportDrafts(rawText);
+      final candidates = extractPersonImportDrafts(rawText);
 
-    expect(candidates.length, 3);
-    expect(candidates[0].name, '김민수');
-    expect(candidates[0].phoneNumber, '01012345678');
-    expect(candidates[1].name, '박영희');
-    expect(candidates[1].phoneNumber, isNull);
-    expect(candidates[2].name, '홍길동');
-    expect(candidates[2].phoneNumber, '01098765432');
-  });
+      expect(candidates.length, 3);
+      expect(candidates[0].name, '김민수');
+      expect(candidates[0].phoneNumber, '01012345678');
+      expect(candidates[1].name, '박영희');
+      expect(candidates[1].phoneNumber, '01098765432');
+      expect(candidates[2].name, '홍길동');
+      expect(candidates[2].phoneNumber, isNull);
+    },
+  );
 
-  test('photo text from the attached screenshots does not become fake names', () {
-    const rawText = '그만 먹으라고 괴물쥐 유튜브 조회수 47만회 2일';
-
-    expect(extractPersonImportDrafts(rawText), isEmpty);
-  });
-
-  test('app screenshot text also stays out of the person candidate list', () {
-    const rawText = '''
+  test(
+    'photo text from posters or app screenshots does not become fake names',
+    () {
+      const rawText = '''
+      그만 먹으라고
+      괴물쥐 유튜브 조회수 47만회 · 2일 전
       사진 글자 스캔
-      사진 속 글자를 추출하고, 사람 이름으로 보이는 항목은 인연 후보로 정리해드려요.
-      아직 스캔한 사진이 없어요.
+      아직 스캔한 사진이 없어요
     ''';
 
-    expect(extractPersonImportDrafts(rawText), isEmpty);
-  });
+      expect(extractPersonImportDrafts(rawText), isEmpty);
+    },
+  );
 }

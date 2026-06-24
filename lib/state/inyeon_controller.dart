@@ -19,8 +19,8 @@ final repositoryProvider = Provider<InyeonRepository>((ref) {
 
 final inyeonControllerProvider =
     StateNotifierProvider<InyeonController, InyeonState>((ref) {
-      return InyeonController(ref.read(repositoryProvider));
-    });
+  return InyeonController(ref.read(repositoryProvider));
+});
 
 class InyeonController extends StateNotifier<InyeonState> {
   InyeonController(this._repository) : super(const InyeonState.loading()) {
@@ -65,15 +65,15 @@ class InyeonController extends StateNotifier<InyeonState> {
         ? input.personId ?? _uuid.v4()
         : people[existingPersonIndex].id;
 
+    final previousPerson =
+        existingPersonIndex == -1 ? null : people[existingPersonIndex];
     final person = Person(
       id: personId,
       name: normalizedName,
       relationship: normalizedRelationship,
-      phoneNumber: nullIfBlank(input.phoneNumber),
-      memo: nullIfBlank(input.memo),
-      createdAt: existingPersonIndex == -1
-          ? now
-          : people[existingPersonIndex].createdAt,
+      phoneNumber: nullIfBlank(input.phoneNumber) ?? previousPerson?.phoneNumber,
+      memo: nullIfBlank(input.memo) ?? previousPerson?.memo,
+      createdAt: previousPerson?.createdAt ?? now,
     );
 
     if (existingPersonIndex == -1) {
@@ -92,6 +92,7 @@ class InyeonController extends StateNotifier<InyeonState> {
       personName: normalizedName,
       relationship: normalizedRelationship,
       eventType: input.eventType,
+      customEventType: nullIfBlank(input.customEventType),
       date: input.date,
       amount: input.amount,
       transactionType: input.transactionType,

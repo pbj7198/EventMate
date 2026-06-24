@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/enums.dart';
 import '../state/inyeon_controller.dart';
 import '../utils/formatters.dart';
 import '../utils/record_summaries.dart';
@@ -33,7 +32,7 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
       final q = _query.trim().toLowerCase();
       return item.personName.toLowerCase().contains(q) ||
           item.relationship.toLowerCase().contains(q) ||
-          item.lastEventType.label.toLowerCase().contains(q);
+          item.lastEventLabel.toLowerCase().contains(q);
     }).toList();
 
     return ListView(
@@ -52,7 +51,7 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
           onChanged: (value) => setState(() => _query = value),
         ),
         const SizedBox(height: 16),
-        const SectionHeader(title: '인연 장부'),
+        const SectionHeader(title: '인연 목록'),
         if (summaries.isEmpty)
           const EmptyStateCard(message: '아직 기록된 인연이 없어요')
         else
@@ -73,7 +72,7 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
                 ),
                 title: Text(summary.personName),
                 subtitle: Text(
-                  '${summary.relationship} · 최근 ${formatDate(summary.lastRecordDate)} · ${summary.lastEventType.label}',
+                  '${summary.relationship} · 최근 ${formatDate(summary.lastRecordDate)} · ${summary.lastEventLabel}',
                 ),
                 trailing: Text(
                   '${summary.recordCount}건',

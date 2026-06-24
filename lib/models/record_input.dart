@@ -8,6 +8,7 @@ class RecordInput {
     required this.personName,
     required this.relationship,
     required this.eventType,
+    this.customEventType,
     required this.date,
     required this.amount,
     required this.transactionType,
@@ -21,6 +22,7 @@ class RecordInput {
   final String personName;
   final String relationship;
   final EventType eventType;
+  final String? customEventType;
   final DateTime date;
   final int amount;
   final TransactionType transactionType;

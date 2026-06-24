@@ -32,13 +32,14 @@ void main() {
 
     await controller.saveRecord(
       RecordInput(
-        personName: '새 인연',
+        personName: '홍길동',
         relationship: '지인',
         eventType: EventType.other,
+        customEventType: '상견례',
         date: DateTime(2026, 6, 24),
         amount: 45000,
         transactionType: TransactionType.given,
-        location: '동네 식당',
+        location: '서울 식당',
         memo: '첫 기록',
         phoneNumber: '010-0000-1111',
       ),
@@ -46,6 +47,7 @@ void main() {
 
     expect(controller.state.people.length, beforePeople + 1);
     expect(controller.state.records.length, beforeRecords + 1);
-    expect(controller.state.records.last.personName, '새 인연');
+    expect(controller.state.records.last.personName, '홍길동');
+    expect(controller.state.records.last.eventTypeLabel, '상견례');
   });
 }

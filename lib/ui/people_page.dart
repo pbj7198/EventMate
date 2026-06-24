@@ -25,7 +25,8 @@ class _PeoplePageState extends ConsumerState<PeoplePage> {
       }
       final q = _query.toLowerCase();
       return person.name.toLowerCase().contains(q) ||
-          person.relationship.toLowerCase().contains(q);
+          person.relationship.toLowerCase().contains(q) ||
+          (person.phoneNumber ?? '').toLowerCase().contains(q);
     }).toList()
       ..sort((a, b) => a.name.compareTo(b.name));
 
@@ -35,7 +36,7 @@ class _PeoplePageState extends ConsumerState<PeoplePage> {
         TextField(
           decoration: const InputDecoration(
             prefixIcon: Icon(Icons.search),
-            hintText: '이름 또는 관계로 검색',
+            hintText: '이름, 관계, 전화번호로 검색',
           ),
           onChanged: (value) => setState(() => _query = value),
         ),
@@ -58,7 +59,12 @@ class _PeoplePageState extends ConsumerState<PeoplePage> {
                   ),
                 ),
                 title: Text(person.name),
-                subtitle: Text(person.relationship),
+                subtitle: Text(
+                  [
+                    person.relationship,
+                    if ((person.phoneNumber ?? '').isNotEmpty) person.phoneNumber!,
+                  ].join(' · '),
+                ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push(

@@ -171,7 +171,7 @@ class RecordTile extends StatelessWidget {
                           runSpacing: 6,
                           children: [
                             _Badge(label: record.relationship),
-                            if (!compact) _Badge(label: record.eventType.label),
+                            if (!compact) _Badge(label: record.eventTypeLabel),
                             _Badge(
                               label: record.transactionType.label,
                               color: typeColor.withValues(alpha: 0.15),
@@ -193,7 +193,7 @@ class RecordTile extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(Icons.event_outlined, size: 16, color: Colors.black54),
+                  const Icon(Icons.event_outlined, size: 16, color: Colors.black54),
                   const SizedBox(width: 4),
                   Text(formatDate(record.date)),
                   if (!compact) ...[

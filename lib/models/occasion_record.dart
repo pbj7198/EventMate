@@ -8,6 +8,7 @@ class OccasionRecord {
     required this.personName,
     required this.relationship,
     required this.eventType,
+    this.customEventType,
     required this.date,
     required this.amount,
     required this.transactionType,
@@ -22,6 +23,7 @@ class OccasionRecord {
   final String personName;
   final String relationship;
   final EventType eventType;
+  final String? customEventType;
   final DateTime date;
   final int amount;
   final TransactionType transactionType;
@@ -30,12 +32,15 @@ class OccasionRecord {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  String get eventTypeLabel => eventTypeLabelFor(this);
+
   OccasionRecord copyWith({
     String? id,
     String? personId,
     String? personName,
     String? relationship,
     EventType? eventType,
+    String? customEventType,
     DateTime? date,
     int? amount,
     TransactionType? transactionType,
@@ -50,6 +55,7 @@ class OccasionRecord {
       personName: personName ?? this.personName,
       relationship: relationship ?? this.relationship,
       eventType: eventType ?? this.eventType,
+      customEventType: customEventType ?? this.customEventType,
       date: date ?? this.date,
       amount: amount ?? this.amount,
       transactionType: transactionType ?? this.transactionType,
@@ -67,6 +73,7 @@ class OccasionRecord {
       'personName': personName,
       'relationship': relationship,
       'eventType': eventType.name,
+      'customEventType': customEventType,
       'date': date.toIso8601String(),
       'amount': amount,
       'transactionType': transactionType.name,
@@ -84,6 +91,7 @@ class OccasionRecord {
       personName: map['personName'] as String? ?? '',
       relationship: map['relationship'] as String? ?? '기타',
       eventType: eventTypeFromString(map['eventType'] as String? ?? 'other'),
+      customEventType: map['customEventType'] as String?,
       date: DateTime.parse(map['date'] as String),
       amount: (map['amount'] as num).toInt(),
       transactionType: transactionTypeFromString(
@@ -95,4 +103,8 @@ class OccasionRecord {
       updatedAt: DateTime.parse(map['updatedAt'] as String),
     );
   }
+}
+
+String eventTypeLabelFor(OccasionRecord record) {
+  return eventTypeLabel(record.eventType, customLabel: record.customEventType);
 }

@@ -25,7 +25,7 @@ class PersonDetailPage extends ConsumerWidget {
     if (person == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('인연 상세')),
-        body: const Center(child: Text('인연 정보를 찾을 수 없어요.')),
+        body: const Center(child: Text('인연 정보를 찾을 수 없어요')),
       );
     }
 
@@ -61,7 +61,8 @@ class PersonDetailPage extends ConsumerWidget {
                   runSpacing: 8,
                   children: [
                     _Tag(person.relationship),
-                    if (person.phoneNumber != null) _Tag(person.phoneNumber!),
+                    if ((person.phoneNumber ?? '').isNotEmpty)
+                      _Tag(person.phoneNumber!),
                   ],
                 ),
                 if ((person.memo ?? '').isNotEmpty) ...[
@@ -93,9 +94,19 @@ class PersonDetailPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 20),
-          const SectionHeader(title: '관련 경조사 기록'),
+          SectionHeader(
+            title: '관련 경조사 기록',
+            actionLabel: '기록 추가',
+            onActionTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RecordFormPage(initialPersonId: person.id),
+                ),
+              );
+            },
+          ),
           if (records.isEmpty)
-            const EmptyStateCard(message: '이 사람과 연결된 기록이 아직 없어요.')
+            const EmptyStateCard(message: '아직 이 인연과 연결된 기록이 없어요')
           else
             ...records.map(
               (record) => Padding(
@@ -135,7 +146,7 @@ class PersonDetailPage extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('기록 삭제'),
-        content: Text('$name 기록을 삭제할까요?'),
+        content: Text('$name의 기록을 삭제할까요?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),

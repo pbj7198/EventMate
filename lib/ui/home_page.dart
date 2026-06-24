@@ -1,4 +1,4 @@
-// Minimal home dashboard focused on quick context and recent activity.
+// Home dashboard focused on quick context and recent activity.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -37,7 +37,7 @@ class HomePage extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
           Text(
-            '이번 달 인연 흐름을 간단히 확인하세요.',
+            '이번 달 인연과 경조사를 빠르게 확인해보세요.',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 16),
@@ -45,7 +45,7 @@ class HomePage extends ConsumerWidget {
             children: [
               Expanded(
                 child: SummaryCard(
-                  title: '준 금액',
+                  title: '총 준 금액',
                   value: formatWon(given),
                   icon: Icons.send_outlined,
                   accentColor: const Color(0xFFB35B3E),
@@ -54,7 +54,7 @@ class HomePage extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: SummaryCard(
-                  title: '받은 금액',
+                  title: '총 받은 금액',
                   value: formatWon(received),
                   icon: Icons.mark_email_read_outlined,
                   accentColor: const Color(0xFF2F7D67),

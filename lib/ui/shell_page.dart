@@ -30,7 +30,7 @@ class _ShellPageState extends State<ShellPage> {
       const StatsPage(),
     ];
 
-    final titles = ['인연장부', '장부', '통계'];
+    final titles = ['홈', '장부', '통계'];
 
     return Scaffold(
       appBar: AppBar(

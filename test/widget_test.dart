@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -34,8 +35,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('인연장부'), findsOneWidget);
-    expect(find.text('이번 달 인연 흐름을 간단히 확인하세요.'), findsOneWidget);
-    expect(find.text('장부'), findsOneWidget);
+    expect(find.text('이번 달 인연과 경조사를 빠르게 확인해보세요.'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
   });
 }

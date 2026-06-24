@@ -27,6 +27,8 @@ class StatsPage extends ConsumerWidget {
     final byEvent = totalsByEventType(records);
     final byRelationship = totalsByRelationship(records);
     final byMonth = monthlySummaries(records);
+    final sortedEventEntries = byEvent.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     final sortedRelationshipEntries = byRelationship.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final sortedMonthEntries = byMonth.entries.toList()
@@ -57,22 +59,28 @@ class StatsPage extends ConsumerWidget {
         ),
         const SizedBox(height: 20),
         const SectionHeader(title: '행사 종류별 금액'),
-        ...EventType.values.map(
-          (type) => _MetricRow(
-            label: type.label,
-            value: formatWon(byEvent[type] ?? 0),
+        if (sortedEventEntries.isEmpty)
+          const EmptyStateCard(message: '아직 기록된 인연이 없어요')
+        else
+          ...sortedEventEntries.map(
+            (entry) => _MetricRow(
+              label: entry.key,
+              value: formatWon(entry.value),
+            ),
           ),
-        ),
         const SizedBox(height: 20),
         const SectionHeader(title: '관계별 금액'),
-        ...sortedRelationshipEntries.map(
-          (entry) =>
-              _MetricRow(label: entry.key, value: formatWon(entry.value)),
-        ),
+        if (sortedRelationshipEntries.isEmpty)
+          const EmptyStateCard(message: '아직 기록된 인연이 없어요')
+        else
+          ...sortedRelationshipEntries.map(
+            (entry) =>
+                _MetricRow(label: entry.key, value: formatWon(entry.value)),
+          ),
         const SizedBox(height: 20),
         const SectionHeader(title: '월별 금액 요약'),
         if (byMonth.isEmpty)
-          const EmptyStateCard(message: '아직 통계가 없어요.')
+          const EmptyStateCard(message: '아직 기록된 인연이 없어요')
         else
           ...sortedMonthEntries.map(
             (entry) => Padding(
@@ -102,7 +110,7 @@ class StatsPage extends ConsumerWidget {
                       value: formatWon(entry.value.received),
                     ),
                     _MetricRow(
-                      label: '합계',
+                      label: '순액',
                       value: formatWon(entry.value.total),
                     ),
                   ],

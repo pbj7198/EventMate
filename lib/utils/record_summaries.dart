@@ -12,7 +12,7 @@ class PersonLedgerSummary {
     required this.received,
     required this.recordCount,
     required this.lastRecordDate,
-    required this.lastEventType,
+    required this.lastEventLabel,
   });
 
   final String personId;
@@ -22,7 +22,7 @@ class PersonLedgerSummary {
   final int received;
   final int recordCount;
   final DateTime lastRecordDate;
-  final EventType lastEventType;
+  final String lastEventLabel;
 
   int get net => received - given;
 }
@@ -67,10 +67,11 @@ int totalAmount(
       .fold<int>(0, (sum, record) => sum + record.amount);
 }
 
-Map<EventType, int> totalsByEventType(Iterable<OccasionRecord> records) {
-  final result = <EventType, int>{};
+Map<String, int> totalsByEventType(Iterable<OccasionRecord> records) {
+  final result = <String, int>{};
   for (final record in records) {
-    result[record.eventType] = (result[record.eventType] ?? 0) + record.amount;
+    result[record.eventTypeLabel] =
+        (result[record.eventTypeLabel] ?? 0) + record.amount;
   }
   return result;
 }
@@ -116,12 +117,12 @@ List<PersonLedgerSummary> personLedgerSummaries(
       recordCount: (existing?.recordCount ?? 0) + 1,
       lastRecordDate:
           existing == null || record.date.isAfter(existing.lastRecordDate)
-          ? record.date
-          : existing.lastRecordDate,
-      lastEventType:
+              ? record.date
+              : existing.lastRecordDate,
+      lastEventLabel:
           existing == null || record.date.isAfter(existing.lastRecordDate)
-          ? record.eventType
-          : existing.lastEventType,
+              ? record.eventTypeLabel
+              : existing.lastEventLabel,
     );
   }
   final list = result.values.toList();

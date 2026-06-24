@@ -43,5 +43,6 @@ flutter {
 }
 
 dependencies {
-    implementation(files("libs/tesseract4android-release.aar"))
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("com.google.mlkit:text-recognition-korean:16.0.1")
 }

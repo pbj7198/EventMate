@@ -2,7 +2,7 @@ name: inyeon_jangbu
 description: "Local occasion ledger app"
 publish_to: 'none'
 
-version: 1.0.12+13
+version: 1.0.13+14
 
 environment:
   sdk: ^3.12.2
@@ -26,6 +26,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/tessdata/
-    - assets/tessdata_config.json

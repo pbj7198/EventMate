@@ -1,6 +1,4 @@
 // OCR service for photographed sheets, posters, and other text-heavy images.
-import 'dart:io';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -31,8 +29,8 @@ class SignatureSheetScanException implements Exception {
   String toString() => message;
 }
 
-class TesseractSignatureSheetScanService implements SignatureSheetScanService {
-  TesseractSignatureSheetScanService({
+class MlKitSignatureSheetScanService implements SignatureSheetScanService {
+  MlKitSignatureSheetScanService({
     ImagePicker? imagePicker,
     MethodChannel? ocrChannel,
   })  : _imagePicker = imagePicker ?? ImagePicker(),
@@ -46,40 +44,25 @@ class TesseractSignatureSheetScanService implements SignatureSheetScanService {
   Future<SignatureSheetScanResult?> scanFromCamera() async {
     final file = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 92,
-      maxWidth: 3000,
-      maxHeight: 3000,
+      imageQuality: 100,
     );
     if (file == null) {
       return null;
     }
 
-    final tessDataPath = await _ensureTessDataPath();
-    final recognizedText = await _recognizeText(
-      file.path,
-      tessDataPath: tessDataPath,
-    );
+    final recognizedText = await _recognizeText(file.path);
     return SignatureSheetScanResult(
       rawText: recognizedText,
       candidates: extractPersonImportDrafts(recognizedText),
     );
   }
 
-  Future<String> _recognizeText(
-    String imagePath, {
-    required String tessDataPath,
-  }) async {
+  Future<String> _recognizeText(String imagePath) async {
     try {
       final recognizedText = await _ocrChannel.invokeMethod<String>(
         'recognizeText',
         <String, Object>{
           'imagePath': imagePath,
-          'tessDataPath': tessDataPath,
-          'language': 'kor+eng',
-          'args': <String, String>{
-            'psm': '6',
-            'preserve_interword_spaces': '1',
-          },
         },
       );
       return recognizedText?.trim() ?? '';
@@ -97,43 +80,10 @@ class TesseractSignatureSheetScanService implements SignatureSheetScanService {
   }
 }
 
-Future<String>? _tessDataPathFuture;
-
-Future<String> _ensureTessDataPath() {
-  return _tessDataPathFuture ??= _copyTessDataToTempDir();
-}
-
-Future<String> _copyTessDataToTempDir() async {
-  final rootDir = Directory(
-    '${Directory.systemTemp.path}${Platform.pathSeparator}inyeon_jangbu_ocr',
-  );
-  final tessDataDir = Directory(
-    '${rootDir.path}${Platform.pathSeparator}tessdata',
-  );
-
-  if (!await tessDataDir.exists()) {
-    await tessDataDir.create(recursive: true);
-  }
-
-  for (final assetName in const ['eng.traineddata', 'kor.traineddata']) {
-    final target = File(
-      '${tessDataDir.path}${Platform.pathSeparator}$assetName',
-    );
-    if (await target.exists()) {
-      continue;
-    }
-
-    final data = await rootBundle.load('assets/tessdata/$assetName');
-    await target.writeAsBytes(data.buffer.asUint8List(), flush: true);
-  }
-
-  return rootDir.path;
-}
-
 final signatureSheetScanServiceProvider = Provider<SignatureSheetScanService>((
   ref,
 ) {
-  return TesseractSignatureSheetScanService();
+  return MlKitSignatureSheetScanService();
 });
 
 List<PersonImportDraft> extractPersonImportDrafts(String rawText) {

@@ -31,29 +31,30 @@ class _SignatureSheetScanPageState
   Widget build(BuildContext context) {
     final selectedCount = _selectedIndexes.length;
     final totalCount = _candidates.length;
+    final hasRawText = (_rawText ?? '').trim().isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('명단 스캔')),
+      appBar: AppBar(title: const Text('사진 글자 스캔')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
           Text(
-            '축의금 명단이나 서명표를 촬영하면 이름 후보를 자동으로 뽑아드려요.',
+            '사진 속 글자를 추출하고, 사람 이름으로 보이는 항목은 인연 후보로 정리해드려요.',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            '사진 품질, 기울기, 손글씨 상태에 따라 결과가 달라질 수 있어요. 마지막 확인은 꼭 사람이 해주세요.',
+            '명단이 아니어도 전체 글자를 확인할 수 있어요. 잘린 글자나 심하게 기울어진 사진은 일부만 인식될 수 있습니다.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
           SummaryCard(
             title: '현재 상태',
-            value: _isScanning ? '인식 중' : '대기',
+            value: _isScanning ? '인식 중' : (_rawText != null ? '완료' : '대기'),
             icon: Icons.document_scanner_outlined,
-            subtitle: totalCount == 0
-                ? '아직 스캔된 명단이 없어요'
-                : '후보 $totalCount명 · 선택 $selectedCount명',
+            subtitle: hasRawText
+                ? '글자 추출 완료 · 이름 후보 $totalCount명'
+                : '아직 스캔한 사진이 없어요',
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
@@ -80,7 +81,7 @@ class _SignatureSheetScanPageState
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.camera_alt_outlined),
-            label: const Text('카메라로 촬영해서 스캔'),
+            label: const Text('카메라로 촬영해서 글자 추출'),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
@@ -92,9 +93,24 @@ class _SignatureSheetScanPageState
             const SizedBox(height: 12),
             Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
           ],
+          if (_rawText != null) ...[
+            const SizedBox(height: 20),
+            const SectionHeader(title: '추출된 글자'),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: hasRawText
+                  ? SelectableText(_rawText!)
+                  : const Text('사진에서 읽을 수 있는 글자를 찾지 못했어요.'),
+            ),
+          ],
           if (_candidates.isNotEmpty) ...[
             const SizedBox(height: 20),
-            const SectionHeader(title: '인식된 후보'),
+            const SectionHeader(title: '이름 후보'),
             ...List.generate(_candidates.length, (index) {
               final candidate = _candidates[index];
               final selected = _selectedIndexes.contains(index);
@@ -129,22 +145,6 @@ class _SignatureSheetScanPageState
                 ),
               );
             }),
-            const SizedBox(height: 8),
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: const Text('원본 OCR 텍스트 보기'),
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: SelectableText(_rawText ?? ''),
-                ),
-              ],
-            ),
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: (_isSaving || selectedCount == 0)

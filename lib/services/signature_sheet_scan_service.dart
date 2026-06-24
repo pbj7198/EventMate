@@ -1,8 +1,6 @@
 // OCR service for sign-in sheets and other photographed name lists.
-import 'dart:typed_data';
-
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image/image.dart' as image;
 import 'package:image_picker/image_picker.dart';
 
@@ -33,10 +31,15 @@ class SignatureSheetScanException implements Exception {
 }
 
 class MlKitSignatureSheetScanService implements SignatureSheetScanService {
-  MlKitSignatureSheetScanService({ImagePicker? imagePicker})
-    : _imagePicker = imagePicker ?? ImagePicker();
+  MlKitSignatureSheetScanService({
+    ImagePicker? imagePicker,
+    MethodChannel? ocrChannel,
+  }) : _imagePicker = imagePicker ?? ImagePicker(),
+       _ocrChannel =
+           ocrChannel ?? const MethodChannel('com.qkrqu.inyeon_jangbu/ocr');
 
   final ImagePicker _imagePicker;
+  final MethodChannel _ocrChannel;
 
   @override
   Future<SignatureSheetScanResult?> scanFromCamera() async {
@@ -50,51 +53,27 @@ class MlKitSignatureSheetScanService implements SignatureSheetScanService {
       return null;
     }
 
-    final bitmap = await _normalizePickedImage(file);
-    final recognizedText = await _recognizeTextWithFallback(bitmap);
+    final normalizedImage = await _normalizePickedImage(file);
+    final recognizedText = await _recognizeText(normalizedImage);
     return SignatureSheetScanResult(
       rawText: recognizedText,
       candidates: extractPersonImportDrafts(recognizedText),
     );
   }
 
-  Future<String> _recognizeTextWithFallback(NormalizedOcrImage bitmap) async {
-    final scripts = <TextRecognitionScript>[
-      TextRecognitionScript.korean,
-      TextRecognitionScript.latin,
-    ];
-
-    Object? lastError;
-    for (final script in scripts) {
-      TextRecognizer? recognizer;
-      try {
-        // Constructing the native recognizer can fail before processImage is
-        // called, so creation belongs inside the guarded fallback path.
-        recognizer = TextRecognizer(script: script);
-        final inputImage = InputImage.fromBitmap(
-          bitmap: bitmap.rgbaBytes,
-          width: bitmap.width,
-          height: bitmap.height,
-        );
-        final result = await recognizer.processImage(inputImage);
-        return result.text;
-      } catch (error) {
-        lastError = error;
-      } finally {
-        if (recognizer != null) {
-          try {
-            await recognizer.close();
-          } catch (_) {
-            // A failed native initialization may not have a detector to close.
-          }
-        }
-      }
+  Future<String> _recognizeText(NormalizedOcrImage image) async {
+    try {
+      final recognizedText = await _ocrChannel.invokeMethod<String>(
+        'recognizeText',
+        <String, Object>{'bytes': image.jpegBytes},
+      );
+      return recognizedText?.trim() ?? '';
+    } on PlatformException catch (error) {
+      throw SignatureSheetScanException(
+        '사진의 글자를 읽지 못했어요. 잠시 후 다시 시도해 주세요.',
+        error,
+      );
     }
-
-    throw SignatureSheetScanException(
-      '사진을 인식하지 못했어요. 문서를 평평하게 놓고 글자가 화면을 채우도록 다시 촬영해 주세요.',
-      lastError,
-    );
   }
 
   Future<NormalizedOcrImage> _normalizePickedImage(XFile file) async {
@@ -111,12 +90,12 @@ class MlKitSignatureSheetScanService implements SignatureSheetScanService {
 
 class NormalizedOcrImage {
   const NormalizedOcrImage({
-    required this.rgbaBytes,
+    required this.jpegBytes,
     required this.width,
     required this.height,
   });
 
-  final Uint8List rgbaBytes;
+  final Uint8List jpegBytes;
   final int width;
   final int height;
 }
@@ -147,10 +126,10 @@ NormalizedOcrImage normalizeOcrImageBytes(
     }
   }
 
-  // Passing a raw bitmap bypasses Android's camera JPEG/EXIF file decoder,
-  // which can throw native ML Kit errors for otherwise readable photos.
+  // Re-encoding applies EXIF orientation and strips camera-specific metadata.
+  // Native code returns only the recognized text, avoiding fragile block data.
   return NormalizedOcrImage(
-    rgbaBytes: normalized.getBytes(order: image.ChannelOrder.rgba),
+    jpegBytes: Uint8List.fromList(image.encodeJpg(normalized, quality: 90)),
     width: normalized.width,
     height: normalized.height,
   );
@@ -228,6 +207,18 @@ String? _extractPhoneNumber(String line) {
 List<PersonImportDraft> _extractNamesFromLine(String line, String? phone) {
   final normalized = line.replaceAll(_phonePattern, ' ');
   final tokens = normalized.split(RegExp(r'[\s,·•/|]+'));
+  final koreanTokens = tokens
+      .map((token) => token.replaceAll(RegExp(r'[^가-힣]'), ''))
+      .where((token) => token.isNotEmpty)
+      .toList();
+  final hasListContext =
+      phone != null ||
+      koreanTokens.length == 1 ||
+      koreanTokens.any(_stopWords.contains);
+  if (!hasListContext) {
+    return const [];
+  }
+
   final candidates = <PersonImportDraft>[];
 
   void addCandidate(String value) {
@@ -263,5 +254,117 @@ List<PersonImportDraft> _extractNamesFromLine(String line, String? phone) {
 
 bool _looksLikeKoreanName(String value) {
   final text = value.replaceAll(' ', '');
-  return RegExp(r'^[가-힣]{2,4}$').hasMatch(text);
+  if (!RegExp(r'^[가-힣]{2,4}$').hasMatch(text)) {
+    return false;
+  }
+
+  return _koreanSurnames.any(text.startsWith);
 }
+
+const _koreanSurnames = <String>{
+  '김',
+  '이',
+  '박',
+  '최',
+  '정',
+  '강',
+  '조',
+  '윤',
+  '장',
+  '임',
+  '한',
+  '오',
+  '서',
+  '신',
+  '권',
+  '황',
+  '안',
+  '송',
+  '전',
+  '홍',
+  '유',
+  '고',
+  '문',
+  '양',
+  '손',
+  '배',
+  '백',
+  '허',
+  '남',
+  '심',
+  '노',
+  '하',
+  '곽',
+  '성',
+  '차',
+  '주',
+  '우',
+  '구',
+  '민',
+  '진',
+  '지',
+  '엄',
+  '채',
+  '원',
+  '천',
+  '방',
+  '공',
+  '현',
+  '함',
+  '변',
+  '염',
+  '여',
+  '추',
+  '도',
+  '소',
+  '석',
+  '선',
+  '설',
+  '마',
+  '길',
+  '연',
+  '위',
+  '표',
+  '명',
+  '기',
+  '반',
+  '왕',
+  '금',
+  '옥',
+  '육',
+  '인',
+  '맹',
+  '제',
+  '모',
+  '탁',
+  '국',
+  '어',
+  '은',
+  '편',
+  '용',
+  '예',
+  '경',
+  '봉',
+  '사',
+  '부',
+  '가',
+  '복',
+  '태',
+  '목',
+  '형',
+  '두',
+  '감',
+  '음',
+  '빈',
+  '동',
+  '온',
+  '호',
+  '남궁',
+  '황보',
+  '제갈',
+  '사공',
+  '선우',
+  '서문',
+  '독고',
+  '동방',
+};

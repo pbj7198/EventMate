@@ -37,10 +37,7 @@ void main() {
 
     expect(normalized.width, 1600);
     expect(normalized.height, lessThanOrEqualTo(1600));
-    expect(
-      normalized.rgbaBytes.length,
-      normalized.width * normalized.height * 4,
-    );
+    expect(image.decodeJpg(normalized.jpegBytes), isNotNull);
   });
 
   test('normalizeOcrImageBytes rejects invalid camera data', () {
@@ -48,5 +45,11 @@ void main() {
       () => normalizeOcrImageBytes(Uint8List.fromList([1, 2, 3])),
       throwsFormatException,
     );
+  });
+
+  test('general Korean text is preserved without false name candidates', () {
+    const rawText = '새벽보기 라이트 안내문';
+
+    expect(extractPersonImportDrafts(rawText), isEmpty);
   });
 }

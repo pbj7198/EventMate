@@ -1,6 +1,6 @@
 // OCR service for photographed sheets, posters, and other text-heavy images.
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/person_import_draft.dart';
@@ -37,59 +37,19 @@ class SignatureSheetScanException implements Exception {
   String toString() => message;
 }
 
-class OcrRecognitionResponse {
-  const OcrRecognitionResponse({
-    required this.status,
-    required this.text,
-    this.message,
-    this.details,
-  });
-
-  final SignatureSheetScanStatus status;
-  final String text;
-  final String? message;
-  final Object? details;
-
-  factory OcrRecognitionResponse.fromMap(Map<Object?, Object?> response) {
-    final statusValue = response['status']?.toString();
-    final text = response['text']?.toString() ?? '';
-    final message = response['message']?.toString();
-    final details = response['details'];
-
-    switch (statusValue) {
-      case 'success':
-        return OcrRecognitionResponse(
-          status: SignatureSheetScanStatus.success,
-          text: text,
-          message: message,
-          details: details,
-        );
-      case 'no_text':
-        return OcrRecognitionResponse(
-          status: SignatureSheetScanStatus.noText,
-          text: '',
-          message: message,
-          details: details,
-        );
-      default:
-        throw SignatureSheetScanException(
-          message ?? 'OCR response was invalid.',
-          details,
-        );
-    }
-  }
-}
+typedef TextRecognizerFactory =
+    TextRecognizer Function(TextRecognitionScript script);
 
 class MlKitSignatureSheetScanService implements SignatureSheetScanService {
   MlKitSignatureSheetScanService({
     ImagePicker? imagePicker,
-    MethodChannel? ocrChannel,
+    TextRecognizerFactory? recognizerFactory,
   }) : _imagePicker = imagePicker ?? ImagePicker(),
-       _ocrChannel =
-           ocrChannel ?? const MethodChannel('com.qkrqu.inyeon_jangbu/ocr');
+       _recognizerFactory =
+           recognizerFactory ?? ((script) => TextRecognizer(script: script));
 
   final ImagePicker _imagePicker;
-  final MethodChannel _ocrChannel;
+  final TextRecognizerFactory _recognizerFactory;
 
   @override
   Future<SignatureSheetScanResult?> scanFromCamera() async {
@@ -101,52 +61,48 @@ class MlKitSignatureSheetScanService implements SignatureSheetScanService {
       return null;
     }
 
-    final response = await _recognizeText(file.path);
-    if (response.status == SignatureSheetScanStatus.noText) {
-      return SignatureSheetScanResult(
+    final rawText = await _recognizeText(file.path);
+    final trimmed = rawText.trim();
+    if (trimmed.isEmpty) {
+      return const SignatureSheetScanResult(
         status: SignatureSheetScanStatus.noText,
         rawText: '',
-        candidates: const [],
-        message:
-            response.message ??
-            '사진에서 읽을 수 있는 글자를 찾지 못했어요. 글자가 화면을 더 크게 채우도록 다시 촬영해 주세요.',
+        candidates: [],
+        message: '사진에서 읽을 수 있는 글자를 찾지 못했어요. 글자가 화면을 더 크게 채우도록 다시 촬영해 주세요.',
       );
     }
 
-    final rawText = response.text.trim();
     return SignatureSheetScanResult(
       status: SignatureSheetScanStatus.success,
-      rawText: rawText,
-      candidates: extractPersonImportDrafts(rawText),
+      rawText: trimmed,
+      candidates: extractPersonImportDrafts(trimmed),
+      message: '사진에서 글자를 읽었어요.',
     );
   }
 
-  Future<OcrRecognitionResponse> _recognizeText(String imagePath) async {
-    try {
-      final response = await _ocrChannel.invokeMapMethod<Object?, Object?>(
-        'recognizeText',
-        <String, Object>{'imagePath': imagePath},
-      );
+  Future<String> _recognizeText(String imagePath) async {
+    final koreanRecognizer = _recognizerFactory(TextRecognitionScript.korean);
+    TextRecognizer? latinRecognizer;
 
-      if (response == null) {
-        return const OcrRecognitionResponse(
-          status: SignatureSheetScanStatus.noText,
-          text: '',
-          message: 'OCR returned no result.',
-        );
+    try {
+      final image = InputImage.fromFilePath(imagePath);
+      final koreanText = await koreanRecognizer.processImage(image);
+      final text = koreanText.text.trim();
+      if (text.isNotEmpty) {
+        return text;
       }
 
-      return OcrRecognitionResponse.fromMap(response);
-    } on PlatformException catch (error) {
-      throw SignatureSheetScanException(
-        '사진의 글자를 읽지 못했어요. 잠시 후 다시 시도해 주세요.',
-        error,
-      );
+      latinRecognizer = _recognizerFactory(TextRecognitionScript.latin);
+      final latinText = await latinRecognizer.processImage(image);
+      return latinText.text.trim();
     } catch (error) {
       throw SignatureSheetScanException(
         '사진의 글자를 읽지 못했어요. 잠시 후 다시 시도해 주세요.',
         error,
       );
+    } finally {
+      koreanRecognizer.close();
+      latinRecognizer?.close();
     }
   }
 }
@@ -251,15 +207,15 @@ const _noiseWords = <String>{
   '명단',
   '방문',
   '생일',
-  '유튜브',
   '서명',
   '선물',
   '신랑',
   '신부',
   '안내',
-  '조회수',
   '예약',
   '응모',
+  '유튜브',
+  '조회수',
   '축의금',
   '회사',
   '친구',

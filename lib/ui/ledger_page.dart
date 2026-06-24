@@ -16,6 +16,8 @@ enum LedgerSortMode {
   name,
 }
 
+enum LedgerFlowFilter { all, givenOnly, receivedOnly }
+
 extension LedgerSortModeX on LedgerSortMode {
   String get label => switch (this) {
         LedgerSortMode.latest => '최근순',
@@ -23,6 +25,14 @@ extension LedgerSortModeX on LedgerSortMode {
         LedgerSortMode.receivedDesc => '받은 금액 많은 순',
         LedgerSortMode.totalDesc => '총액 많은 순',
         LedgerSortMode.name => '이름순',
+      };
+}
+
+extension LedgerFlowFilterX on LedgerFlowFilter {
+  String get label => switch (this) {
+        LedgerFlowFilter.all => '전체',
+        LedgerFlowFilter.givenOnly => '보낸 것만',
+        LedgerFlowFilter.receivedOnly => '받은 것만',
       };
 }
 
@@ -36,6 +46,7 @@ class LedgerPage extends ConsumerStatefulWidget {
 class _LedgerPageState extends ConsumerState<LedgerPage> {
   String _query = '';
   LedgerSortMode _sortMode = LedgerSortMode.latest;
+  LedgerFlowFilter _flowFilter = LedgerFlowFilter.all;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +63,12 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
       return item.personName.toLowerCase().contains(q) ||
           item.relationship.toLowerCase().contains(q) ||
           item.lastEventLabel.toLowerCase().contains(q);
+    }).where((item) {
+      return switch (_flowFilter) {
+        LedgerFlowFilter.all => true,
+        LedgerFlowFilter.givenOnly => item.givenCount > 0,
+        LedgerFlowFilter.receivedOnly => item.receivedCount > 0,
+      };
     }).toList();
 
     summaries.sort((a, b) {
@@ -65,6 +82,15 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
       };
     });
 
+    final totalGivenCount = summaries.fold<int>(
+      0,
+      (sum, summary) => sum + summary.givenCount,
+    );
+    final totalReceivedCount = summaries.fold<int>(
+      0,
+      (sum, summary) => sum + summary.receivedCount,
+    );
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
       children: [
@@ -74,7 +100,7 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          '정렬을 바꾸면 보낸 금액이 큰 사람, 받은 금액이 큰 사람을 바로 볼 수 있어요.',
+          '필터와 정렬을 바꾸면 필요한 사람만 더 빠르게 볼 수 있어요.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 16),
@@ -84,6 +110,25 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
             hintText: '이름, 관계, 행사 종류 검색',
           ),
           onChanged: (value) => setState(() => _query = value),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '필터',
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: LedgerFlowFilter.values
+              .map(
+                (filter) => ChoiceChip(
+                  label: Text(filter.label),
+                  selected: _flowFilter == filter,
+                  onSelected: (_) => setState(() => _flowFilter = filter),
+                ),
+              )
+              .toList(),
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<LedgerSortMode>(
@@ -102,6 +147,13 @@ class _LedgerPageState extends ConsumerState<LedgerPage> {
               setState(() => _sortMode = value);
             }
           },
+        ),
+        const SizedBox(height: 16),
+        SummaryCard(
+          title: '현재 보기',
+          value: '${summaries.length}명',
+          icon: Icons.filter_alt_outlined,
+          subtitle: '보낸 $totalGivenCount건 · 받은 $totalReceivedCount건',
         ),
         const SizedBox(height: 16),
         const SectionHeader(title: '인연 목록'),

@@ -1,9 +1,11 @@
 // OCR service for sign-in sheets and other photographed name lists.
+import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/person_import_draft.dart';
 
@@ -37,9 +39,14 @@ class MlKitSignatureSheetScanService implements SignatureSheetScanService {
       return null;
     }
 
+    // Persist the captured image into the app's own temporary directory.
+    // Samsung/Android camera flows can hand back a cache-backed file that is
+    // no longer readable by the time ML Kit starts processing it.
+    final persistedImage = await _persistPickedImage(file);
+
     final recognizer = TextRecognizer(script: TextRecognitionScript.korean);
     try {
-      final inputImage = InputImage.fromFilePath(file.path);
+      final inputImage = InputImage.fromFilePath(persistedImage.path);
       final recognizedText = await recognizer.processImage(inputImage);
       final candidates = extractPersonImportDrafts(recognizedText.text);
       return SignatureSheetScanResult(
@@ -49,6 +56,15 @@ class MlKitSignatureSheetScanService implements SignatureSheetScanService {
     } finally {
       unawaited(recognizer.close());
     }
+  }
+
+  Future<File> _persistPickedImage(XFile file) async {
+    final tempDir = await getTemporaryDirectory();
+    final target = File(
+      '${tempDir.path}/signature_sheet_${DateTime.now().microsecondsSinceEpoch}.jpg',
+    );
+    final bytes = await file.readAsBytes();
+    return target.writeAsBytes(bytes, flush: true);
   }
 }
 

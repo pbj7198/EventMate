@@ -44,18 +44,34 @@ class MlKitSignatureSheetScanService implements SignatureSheetScanService {
     // no longer readable by the time ML Kit starts processing it.
     final persistedImage = await _persistPickedImage(file);
 
-    final recognizer = TextRecognizer(script: TextRecognitionScript.korean);
-    try {
-      final inputImage = InputImage.fromFilePath(persistedImage.path);
-      final recognizedText = await recognizer.processImage(inputImage);
-      final candidates = extractPersonImportDrafts(recognizedText.text);
-      return SignatureSheetScanResult(
-        rawText: recognizedText.text,
-        candidates: candidates,
-      );
-    } finally {
-      unawaited(recognizer.close());
+    final recognizedText = await _recognizeTextWithFallback(persistedImage);
+    return SignatureSheetScanResult(
+      rawText: recognizedText,
+      candidates: extractPersonImportDrafts(recognizedText),
+    );
+  }
+
+  Future<String> _recognizeTextWithFallback(File imageFile) async {
+    final inputImage = InputImage.fromFilePath(imageFile.path);
+    final scripts = <TextRecognitionScript>[
+      TextRecognitionScript.korean,
+      TextRecognitionScript.latin,
+    ];
+
+    Object? lastError;
+    for (final script in scripts) {
+      final recognizer = TextRecognizer(script: script);
+      try {
+        final result = await recognizer.processImage(inputImage);
+        return result.text;
+      } catch (error) {
+        lastError = error;
+      } finally {
+        unawaited(recognizer.close());
+      }
     }
+
+    throw lastError ?? StateError('OCR recognition failed');
   }
 
   Future<File> _persistPickedImage(XFile file) async {

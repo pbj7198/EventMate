@@ -1,11 +1,10 @@
 // OCR service for sign-in sheets and other photographed name lists.
-import 'dart:io';
-import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:image/image.dart' as image;
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../models/person_import_draft.dart';
 
@@ -23,9 +22,19 @@ class SignatureSheetScanResult {
   final List<PersonImportDraft> candidates;
 }
 
+class SignatureSheetScanException implements Exception {
+  const SignatureSheetScanException(this.message, [this.cause]);
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => message;
+}
+
 class MlKitSignatureSheetScanService implements SignatureSheetScanService {
   MlKitSignatureSheetScanService({ImagePicker? imagePicker})
-      : _imagePicker = imagePicker ?? ImagePicker();
+    : _imagePicker = imagePicker ?? ImagePicker();
 
   final ImagePicker _imagePicker;
 
@@ -33,26 +42,23 @@ class MlKitSignatureSheetScanService implements SignatureSheetScanService {
   Future<SignatureSheetScanResult?> scanFromCamera() async {
     final file = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 90,
+      imageQuality: 85,
+      maxWidth: 2400,
+      maxHeight: 2400,
     );
     if (file == null) {
       return null;
     }
 
-    // Persist the captured image into the app's own temporary directory.
-    // Samsung/Android camera flows can hand back a cache-backed file that is
-    // no longer readable by the time ML Kit starts processing it.
-    final persistedImage = await _persistPickedImage(file);
-
-    final recognizedText = await _recognizeTextWithFallback(persistedImage);
+    final bitmap = await _normalizePickedImage(file);
+    final recognizedText = await _recognizeTextWithFallback(bitmap);
     return SignatureSheetScanResult(
       rawText: recognizedText,
       candidates: extractPersonImportDrafts(recognizedText),
     );
   }
 
-  Future<String> _recognizeTextWithFallback(File imageFile) async {
-    final inputImage = InputImage.fromFilePath(imageFile.path);
+  Future<String> _recognizeTextWithFallback(NormalizedOcrImage bitmap) async {
     final scripts = <TextRecognitionScript>[
       TextRecognitionScript.korean,
       TextRecognitionScript.latin,
@@ -60,32 +66,99 @@ class MlKitSignatureSheetScanService implements SignatureSheetScanService {
 
     Object? lastError;
     for (final script in scripts) {
-      final recognizer = TextRecognizer(script: script);
+      TextRecognizer? recognizer;
       try {
+        // Constructing the native recognizer can fail before processImage is
+        // called, so creation belongs inside the guarded fallback path.
+        recognizer = TextRecognizer(script: script);
+        final inputImage = InputImage.fromBitmap(
+          bitmap: bitmap.rgbaBytes,
+          width: bitmap.width,
+          height: bitmap.height,
+        );
         final result = await recognizer.processImage(inputImage);
         return result.text;
       } catch (error) {
         lastError = error;
       } finally {
-        unawaited(recognizer.close());
+        if (recognizer != null) {
+          try {
+            await recognizer.close();
+          } catch (_) {
+            // A failed native initialization may not have a detector to close.
+          }
+        }
       }
     }
 
-    throw lastError ?? StateError('OCR recognition failed');
+    throw SignatureSheetScanException(
+      '사진을 인식하지 못했어요. 문서를 평평하게 놓고 글자가 화면을 채우도록 다시 촬영해 주세요.',
+      lastError,
+    );
   }
 
-  Future<File> _persistPickedImage(XFile file) async {
-    final tempDir = await getTemporaryDirectory();
-    final target = File(
-      '${tempDir.path}/signature_sheet_${DateTime.now().microsecondsSinceEpoch}.jpg',
-    );
-    final bytes = await file.readAsBytes();
-    return target.writeAsBytes(bytes, flush: true);
+  Future<NormalizedOcrImage> _normalizePickedImage(XFile file) async {
+    try {
+      return normalizeOcrImageBytes(await file.readAsBytes());
+    } catch (error) {
+      throw SignatureSheetScanException(
+        '촬영한 사진을 읽지 못했어요. 카메라를 다시 열어 촬영해 주세요.',
+        error,
+      );
+    }
   }
 }
 
-final signatureSheetScanServiceProvider =
-    Provider<SignatureSheetScanService>((ref) {
+class NormalizedOcrImage {
+  const NormalizedOcrImage({
+    required this.rgbaBytes,
+    required this.width,
+    required this.height,
+  });
+
+  final Uint8List rgbaBytes;
+  final int width;
+  final int height;
+}
+
+NormalizedOcrImage normalizeOcrImageBytes(
+  Uint8List bytes, {
+  int maxDimension = 1600,
+}) {
+  image.Image? decoded;
+  try {
+    decoded = image.decodeImage(bytes);
+  } catch (error) {
+    throw FormatException('Unsupported image data', error);
+  }
+  if (decoded == null) {
+    throw const FormatException('Unsupported image data');
+  }
+
+  var normalized = image.bakeOrientation(decoded);
+  final longestSide = normalized.width > normalized.height
+      ? normalized.width
+      : normalized.height;
+  if (longestSide > maxDimension) {
+    if (normalized.width >= normalized.height) {
+      normalized = image.copyResize(normalized, width: maxDimension);
+    } else {
+      normalized = image.copyResize(normalized, height: maxDimension);
+    }
+  }
+
+  // Passing a raw bitmap bypasses Android's camera JPEG/EXIF file decoder,
+  // which can throw native ML Kit errors for otherwise readable photos.
+  return NormalizedOcrImage(
+    rgbaBytes: normalized.getBytes(order: image.ChannelOrder.rgba),
+    width: normalized.width,
+    height: normalized.height,
+  );
+}
+
+final signatureSheetScanServiceProvider = Provider<SignatureSheetScanService>((
+  ref,
+) {
   return MlKitSignatureSheetScanService();
 });
 
@@ -112,9 +185,7 @@ List<PersonImportDraft> extractPersonImportDrafts(String rawText) {
   return candidates;
 }
 
-final _phonePattern = RegExp(
-  r'(01[016789][-\s]?\d{3,4}[-\s]?\d{4})',
-);
+final _phonePattern = RegExp(r'(01[016789][-\s]?\d{3,4}[-\s]?\d{4})');
 
 final _stopWords = <String>{
   '서명',
@@ -171,11 +242,7 @@ List<PersonImportDraft> _extractNamesFromLine(String line, String? phone) {
       return;
     }
     candidates.add(
-      PersonImportDraft(
-        name: name,
-        phoneNumber: phone,
-        sourceLine: line,
-      ),
+      PersonImportDraft(name: name, phoneNumber: phone, sourceLine: line),
     );
   }
 

@@ -15,15 +15,9 @@ class SignatureSheetScanPage extends ConsumerStatefulWidget {
       _SignatureSheetScanPageState();
 }
 
-class _SignatureSheetScanPageState extends ConsumerState<SignatureSheetScanPage> {
-  final _relationshipOptions = const [
-    '지인',
-    '친구',
-    '친척',
-    '회사',
-    '가족',
-    '기타',
-  ];
+class _SignatureSheetScanPageState
+    extends ConsumerState<SignatureSheetScanPage> {
+  final _relationshipOptions = const ['지인', '친구', '친척', '회사', '가족', '기타'];
 
   List<PersonImportDraft> _candidates = const [];
   Set<int> _selectedIndexes = <int>{};
@@ -67,10 +61,7 @@ class _SignatureSheetScanPageState extends ConsumerState<SignatureSheetScanPage>
             decoration: const InputDecoration(labelText: '관계'),
             items: _relationshipOptions
                 .map(
-                  (value) => DropdownMenuItem(
-                    value: value,
-                    child: Text(value),
-                  ),
+                  (value) => DropdownMenuItem(value: value, child: Text(value)),
                 )
                 .toList(),
             onChanged: (value) {
@@ -99,10 +90,7 @@ class _SignatureSheetScanPageState extends ConsumerState<SignatureSheetScanPage>
           ),
           if (_errorMessage != null) ...[
             const SizedBox(height: 12),
-            Text(
-              _errorMessage!,
-              style: const TextStyle(color: Colors.red),
-            ),
+            Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
           ],
           if (_candidates.isNotEmpty) ...[
             const SizedBox(height: 20),
@@ -125,11 +113,13 @@ class _SignatureSheetScanPageState extends ConsumerState<SignatureSheetScanPage>
                       });
                     },
                     title: Text(candidate.name),
-                    subtitle: Text([
-                      if ((candidate.phoneNumber ?? '').isNotEmpty)
-                        candidate.phoneNumber!,
-                      candidate.sourceLine,
-                    ].join(' · ')),
+                    subtitle: Text(
+                      [
+                        if ((candidate.phoneNumber ?? '').isNotEmpty)
+                          candidate.phoneNumber!,
+                        candidate.sourceLine,
+                      ].join(' · '),
+                    ),
                     secondary: IconButton(
                       tooltip: '수정',
                       icon: const Icon(Icons.edit_outlined),
@@ -157,8 +147,9 @@ class _SignatureSheetScanPageState extends ConsumerState<SignatureSheetScanPage>
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed:
-                  (_isSaving || selectedCount == 0) ? null : _saveSelected,
+              onPressed: (_isSaving || selectedCount == 0)
+                  ? null
+                  : _saveSelected,
               icon: _isSaving
                   ? const SizedBox(
                       width: 16,
@@ -210,12 +201,20 @@ class _SignatureSheetScanPageState extends ConsumerState<SignatureSheetScanPage>
         _rawText = result.rawText;
         _isScanning = false;
       });
-    } catch (error) {
+    } on SignatureSheetScanException catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _errorMessage = '스캔에 실패했어요: $error';
+        _errorMessage = error.message;
+        _isScanning = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = '스캔 중 문제가 발생했어요. 잠시 후 다시 촬영해 주세요.';
         _isScanning = false;
       });
     }
@@ -224,8 +223,9 @@ class _SignatureSheetScanPageState extends ConsumerState<SignatureSheetScanPage>
   Future<void> _editCandidate(int index) async {
     final candidate = _candidates[index];
     final nameController = TextEditingController(text: candidate.name);
-    final phoneController =
-        TextEditingController(text: candidate.phoneNumber ?? '');
+    final phoneController = TextEditingController(
+      text: candidate.phoneNumber ?? '',
+    );
 
     final updated = await showDialog<PersonImportDraft>(
       context: context,
@@ -289,10 +289,7 @@ class _SignatureSheetScanPageState extends ConsumerState<SignatureSheetScanPage>
           .map((index) => _candidates[index])
           .where((draft) => draft.name.trim().isNotEmpty)
           .toList();
-      await controller.importPeople(
-        drafts,
-        relationship: _relationship,
-      );
+      await controller.importPeople(drafts, relationship: _relationship);
       if (!mounted) {
         return;
       }

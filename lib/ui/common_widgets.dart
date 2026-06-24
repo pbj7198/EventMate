@@ -133,11 +133,13 @@ class RecordTile extends StatelessWidget {
     required this.record,
     this.onTap,
     this.onDelete,
+    this.compact = false,
   });
 
   final OccasionRecord record;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -169,7 +171,7 @@ class RecordTile extends StatelessWidget {
                           runSpacing: 6,
                           children: [
                             _Badge(label: record.relationship),
-                            _Badge(label: record.eventType.label),
+                            if (!compact) _Badge(label: record.eventType.label),
                             _Badge(
                               label: record.transactionType.label,
                               color: typeColor.withValues(alpha: 0.15),
@@ -194,25 +196,27 @@ class RecordTile extends StatelessWidget {
                   Icon(Icons.event_outlined, size: 16, color: Colors.black54),
                   const SizedBox(width: 4),
                   Text(formatDate(record.date)),
-                  const SizedBox(width: 12),
-                  if (record.location != null &&
-                      record.location!.isNotEmpty) ...[
-                    const Icon(
-                      Icons.place_outlined,
-                      size: 16,
-                      color: Colors.black54,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        record.location!,
-                        overflow: TextOverflow.ellipsis,
+                  if (!compact) ...[
+                    const SizedBox(width: 12),
+                    if (record.location != null &&
+                        record.location!.isNotEmpty) ...[
+                      const Icon(
+                        Icons.place_outlined,
+                        size: 16,
+                        color: Colors.black54,
                       ),
-                    ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          record.location!,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
-              if ((record.memo ?? '').isNotEmpty) ...[
+              if (!compact && (record.memo ?? '').isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
                   record.memo!,

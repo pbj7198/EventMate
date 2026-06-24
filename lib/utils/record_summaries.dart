@@ -3,6 +3,27 @@ import '../models/enums.dart';
 import '../models/occasion_record.dart';
 import 'formatters.dart';
 
+class PersonLedgerSummary {
+  PersonLedgerSummary({
+    required this.personId,
+    required this.personName,
+    required this.relationship,
+    required this.given,
+    required this.received,
+    required this.lastRecordDate,
+  });
+
+  final String personId;
+  final String personName;
+  final String relationship;
+  final int given;
+  final int received;
+  final DateTime lastRecordDate;
+
+  int get net => received - given;
+  int get activityCount => given == 0 && received == 0 ? 0 : 1;
+}
+
 class MonthlySummary {
   MonthlySummary({
     required this.monthLabel,
@@ -74,4 +95,32 @@ Map<String, MonthlySummary> monthlySummaries(Iterable<OccasionRecord> records) {
     );
   }
   return result;
+}
+
+List<PersonLedgerSummary> personLedgerSummaries(
+  Iterable<OccasionRecord> records,
+) {
+  final result = <String, PersonLedgerSummary>{};
+  for (final record in records) {
+    final existing = result[record.personId];
+    final isGiven = record.transactionType == TransactionType.given;
+    result[record.personId] = PersonLedgerSummary(
+      personId: record.personId,
+      personName: record.personName,
+      relationship: record.relationship,
+      given: (existing?.given ?? 0) + (isGiven ? record.amount : 0),
+      received: (existing?.received ?? 0) + (isGiven ? 0 : record.amount),
+      lastRecordDate:
+          existing == null || record.date.isAfter(existing.lastRecordDate)
+          ? record.date
+          : existing.lastRecordDate,
+    );
+  }
+  final list = result.values.toList();
+  list.sort((a, b) {
+    final activityCompare = b.lastRecordDate.compareTo(a.lastRecordDate);
+    if (activityCompare != 0) return activityCompare;
+    return a.personName.compareTo(b.personName);
+  });
+  return list;
 }

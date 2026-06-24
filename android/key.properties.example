@@ -1,0 +1,5 @@
+# Copy this file to android/key.properties and fill in your local signing values.
+storePassword=change_me
+keyPassword=change_me
+keyAlias=eventmate
+storeFile=../app/upload-keystore.jks

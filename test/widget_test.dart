@@ -35,7 +35,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('인연장부'), findsOneWidget);
-    expect(find.text('이번 달 경조사 목록'), findsOneWidget);
-    expect(find.text('총 준 금액'), findsWidgets);
+    expect(find.text('이번 달 인연 흐름을 간단히 확인하세요.'), findsOneWidget);
+    expect(find.text('장부'), findsOneWidget);
   });
 }

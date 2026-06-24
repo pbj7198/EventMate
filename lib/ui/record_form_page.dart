@@ -1,4 +1,4 @@
-// Add/edit screen for occasion records with fast, minimal inputs.
+// Add/edit screen for occasion records with a quick-first layout.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,6 +31,7 @@ class _RecordFormPageState extends ConsumerState<RecordFormPage> {
   late TransactionType _transactionType;
   String _relationship = relationshipOptions.first;
   Person? _linkedPerson;
+  bool _showMore = false;
 
   @override
   void initState() {
@@ -46,20 +47,14 @@ class _RecordFormPageState extends ConsumerState<RecordFormPage> {
       text: record?.personName ?? person?.name ?? '',
     );
     _phoneController = TextEditingController(text: person?.phoneNumber ?? '');
-    _amountController = TextEditingController(
-      text: record?.amount.toString() ?? '',
-    );
+    _amountController = TextEditingController(text: record?.amount.toString() ?? '');
     _locationController = TextEditingController(text: record?.location ?? '');
-    _memoController = TextEditingController(
-      text: record?.memo ?? person?.memo ?? '',
-    );
+    _memoController = TextEditingController(text: record?.memo ?? person?.memo ?? '');
     _date = record?.date ?? DateTime.now();
     _eventType = record?.eventType ?? EventType.wedding;
     _transactionType = record?.transactionType ?? TransactionType.given;
     _relationship =
-        record?.relationship ??
-        person?.relationship ??
-        relationshipOptions.first;
+        record?.relationship ?? person?.relationship ?? relationshipOptions.first;
   }
 
   @override
@@ -82,6 +77,11 @@ class _RecordFormPageState extends ConsumerState<RecordFormPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            Text(
+              '먼저 핵심 정보만 빠르게 입력하고, 필요한 경우 추가 정보를 펼쳐보세요.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
             _fieldTitle('이름'),
             TextFormField(
               controller: _nameController,
@@ -128,6 +128,22 @@ class _RecordFormPageState extends ConsumerState<RecordFormPage> {
                   .toList(),
             ),
             const SizedBox(height: 16),
+            _fieldTitle('구분'),
+            SegmentedButton<TransactionType>(
+              segments: TransactionType.values
+                  .map(
+                    (type) => ButtonSegment(
+                      value: type,
+                      label: Text(type.label),
+                    ),
+                  )
+                  .toList(),
+              selected: {_transactionType},
+              onSelectionChanged: (selected) {
+                setState(() => _transactionType = selected.first);
+              },
+            ),
+            const SizedBox(height: 16),
             _fieldTitle('날짜'),
             OutlinedButton.icon(
               onPressed: _pickDate,
@@ -148,47 +164,44 @@ class _RecordFormPageState extends ConsumerState<RecordFormPage> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
-            _fieldTitle('구분'),
-            SegmentedButton<TransactionType>(
-              segments: TransactionType.values
-                  .map(
-                    (type) =>
-                        ButtonSegment(value: type, label: Text(type.label)),
-                  )
-                  .toList(),
-              selected: {_transactionType},
-              onSelectionChanged: (selected) {
-                setState(() => _transactionType = selected.first);
-              },
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () => setState(() => _showMore = !_showMore),
+              icon: Icon(_showMore ? Icons.expand_less : Icons.expand_more),
+              label: Text(_showMore ? '추가 정보 접기' : '추가 정보 보기'),
             ),
-            const SizedBox(height: 16),
-            _fieldTitle('장소'),
-            TextFormField(
-              controller: _locationController,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(hintText: '예: 서울 웨딩홀'),
-            ),
-            const SizedBox(height: 16),
-            _fieldTitle('메모'),
-            TextFormField(
-              controller: _memoController,
-              maxLines: 3,
-              decoration: const InputDecoration(hintText: '예: 축하 메시지 전달'),
-            ),
-            const SizedBox(height: 16),
-            ExpansionTile(
-              title: const Text('추가 정보'),
-              children: [
-                const SizedBox(height: 8),
-                _fieldTitle('전화번호'),
-                TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(hintText: '선택 입력'),
-                ),
-                const SizedBox(height: 16),
-              ],
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 180),
+              crossFadeState: _showMore
+                  ? CrossFadeState.showFirst
+                  : CrossFadeState.showSecond,
+              firstChild: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  _fieldTitle('장소'),
+                  TextFormField(
+                    controller: _locationController,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(hintText: '예: 서울 웨딩홀'),
+                  ),
+                  const SizedBox(height: 16),
+                  _fieldTitle('메모'),
+                  TextFormField(
+                    controller: _memoController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(hintText: '예: 축하 메시지 전달'),
+                  ),
+                  const SizedBox(height: 16),
+                  _fieldTitle('전화번호'),
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(hintText: '선택 입력'),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+              secondChild: const SizedBox.shrink(),
             ),
             const SizedBox(height: 12),
             FilledButton.icon(

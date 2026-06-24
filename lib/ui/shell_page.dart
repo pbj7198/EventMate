@@ -1,8 +1,8 @@
-// Bottom navigation shell that hosts the three main top-level tabs.
+// Bottom navigation shell that keeps the app focused on summary, ledger, and stats.
 import 'package:flutter/material.dart';
 
 import 'home_page.dart';
-import 'people_page.dart';
+import 'ledger_page.dart';
 import 'record_form_page.dart';
 import 'stats_page.dart';
 
@@ -17,22 +17,24 @@ class _ShellPageState extends State<ShellPage> {
   int _index = 0;
 
   void _openAddRecord() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const RecordFormPage()));
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const RecordFormPage()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
       HomePage(onAddRecord: _openAddRecord),
-      PeoplePage(onAddRecord: _openAddRecord),
+      LedgerPage(onAddRecord: _openAddRecord),
       const StatsPage(),
     ];
 
+    final titles = ['인연장부', '장부', '통계'];
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('인연장부'),
+        title: Text(titles[_index]),
         actions: [
           IconButton(
             tooltip: '기록 추가',
@@ -45,7 +47,7 @@ class _ShellPageState extends State<ShellPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openAddRecord,
         icon: const Icon(Icons.note_add_outlined),
-        label: const Text('빠른 기록'),
+        label: const Text('기록 추가'),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
@@ -57,9 +59,9 @@ class _ShellPageState extends State<ShellPage> {
             label: '홈',
           ),
           NavigationDestination(
-            icon: Icon(Icons.people_alt_outlined),
-            selectedIcon: Icon(Icons.people_alt),
-            label: '인연',
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long),
+            label: '장부',
           ),
           NavigationDestination(
             icon: Icon(Icons.query_stats_outlined),

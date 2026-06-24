@@ -1,4 +1,4 @@
-// Home dashboard that surfaces this month's records and quick totals.
+// Minimal home dashboard focused on today's quick context and fast actions.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,7 +7,6 @@ import '../state/inyeon_controller.dart';
 import '../utils/formatters.dart';
 import '../utils/record_summaries.dart';
 import 'common_widgets.dart';
-import 'person_detail_page.dart';
 import 'record_form_page.dart';
 
 class HomePage extends ConsumerWidget {
@@ -32,6 +31,8 @@ class HomePage extends ConsumerWidget {
       state.records,
       transactionType: TransactionType.received,
     );
+    final recentRecords = [...state.records]
+      ..sort((a, b) => b.date.compareTo(a.date));
 
     return RefreshIndicator(
       onRefresh: () => ref.read(inyeonControllerProvider.notifier).load(),
@@ -39,60 +40,64 @@ class HomePage extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
           Text(
-            '이번 달 인연 흐름을 한눈에 확인하세요.',
+            '이번 달 인연 흐름을 간단히 확인하세요.',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 16),
-          GridView.count(
-            crossAxisCount: MediaQuery.of(context).size.width > 700 ? 4 : 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            mainAxisExtent: 170,
+          Row(
             children: [
-              SummaryCard(
-                title: '총 준 금액',
-                value: formatWon(given),
-                icon: Icons.send_outlined,
-                accentColor: const Color(0xFFB35B3E),
+              Expanded(
+                child: SummaryCard(
+                  title: '준 금액',
+                  value: formatWon(given),
+                  icon: Icons.send_outlined,
+                  accentColor: const Color(0xFFB35B3E),
+                ),
               ),
-              SummaryCard(
-                title: '총 받은 금액',
-                value: formatWon(received),
-                icon: Icons.mark_email_read_outlined,
-                accentColor: const Color(0xFF2F7D67),
-              ),
-              SummaryCard(
-                title: '이번 달 기록',
-                value: '${monthRecords.length}건',
-                icon: Icons.event_note_outlined,
-              ),
-              SummaryCard(
-                title: '등록된 인연',
-                value: '${state.people.length}명',
-                icon: Icons.groups_outlined,
+              const SizedBox(width: 12),
+              Expanded(
+                child: SummaryCard(
+                  title: '받은 금액',
+                  value: formatWon(received),
+                  icon: Icons.mark_email_read_outlined,
+                  accentColor: const Color(0xFF2F7D67),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           SectionHeader(
-            title: '이번 달 경조사 목록',
-            actionLabel: '기록 추가',
+            title: '빠른 기록',
+            actionLabel: '추가',
             onActionTap: onAddRecord,
           ),
+          FilledButton.icon(
+            onPressed: onAddRecord,
+            icon: const Icon(Icons.add),
+            label: const Text('경조사 기록 추가'),
+          ),
+          const SizedBox(height: 20),
+          const SectionHeader(title: '이번 달 경조사'),
           if (monthRecords.isEmpty)
-            EmptyStateCard(
-              message: '아직 기록된 인연이 없어요.\n빠른 기록으로 첫 경조사를 남겨보세요.',
-              actionLabel: '기록 추가',
-              onActionTap: onAddRecord,
-            )
+            const EmptyStateCard(message: '아직 기록된 인연이 없어요')
           else
-            ...monthRecords.map(
+            ...monthRecords.take(3).map(
+              (record) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: RecordTile(record: record, compact: true),
+              ),
+            ),
+          const SizedBox(height: 8),
+          SectionHeader(title: '최근 기록'),
+          if (recentRecords.isEmpty)
+            const EmptyStateCard(message: '아직 기록된 인연이 없어요')
+          else
+            ...recentRecords.take(2).map(
               (record) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: RecordTile(
                   record: record,
+                  compact: true,
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -103,35 +108,6 @@ class HomePage extends ConsumerWidget {
                 ),
               ),
             ),
-          const SizedBox(height: 8),
-          SectionHeader(title: '최근 인연'),
-          if (state.people.isEmpty)
-            const EmptyStateCard(message: '아직 기록된 인연이 없어요')
-          else
-            ...state.people
-                .take(3)
-                .map(
-                  (person) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      tileColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      title: Text(person.name),
-                      subtitle: Text(person.relationship),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                PersonDetailPage(personId: person.id),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
         ],
       ),
     );

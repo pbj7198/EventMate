@@ -5,6 +5,7 @@ import 'calendar_page.dart';
 import 'home_page.dart';
 import 'ledger_page.dart';
 import 'record_form_page.dart';
+import 'signature_sheet_scan_page.dart';
 import 'stats_page.dart';
 
 class ShellPage extends StatefulWidget {
@@ -23,6 +24,12 @@ class _ShellPageState extends State<ShellPage> {
     );
   }
 
+  void _openScanSheet() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SignatureSheetScanPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
@@ -38,6 +45,11 @@ class _ShellPageState extends State<ShellPage> {
       appBar: AppBar(
         title: Text(titles[_index]),
         actions: [
+          IconButton(
+            tooltip: '명단 스캔',
+            onPressed: _openScanSheet,
+            icon: const Icon(Icons.document_scanner_outlined),
+          ),
           IconButton(
             tooltip: '기록 추가',
             onPressed: _openAddRecord,

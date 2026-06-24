@@ -1,0 +1,25 @@
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:inyeon_jangbu/services/signature_sheet_scan_service.dart';
+
+void main() {
+  test('extractPersonImportDrafts finds names and phones from raw OCR text', () {
+    const rawText = '''
+    서명
+    김민수 010-1234-5678
+    박영희
+    총무
+    이준호 010 9876 5432
+    ''';
+
+    final candidates = extractPersonImportDrafts(rawText);
+
+    expect(candidates.length, 3);
+    expect(candidates[0].name, '김민수');
+    expect(candidates[0].phoneNumber, '01012345678');
+    expect(candidates[1].name, '박영희');
+    expect(candidates[1].phoneNumber, isNull);
+    expect(candidates[2].name, '이준호');
+    expect(candidates[2].phoneNumber, '01098765432');
+  });
+}

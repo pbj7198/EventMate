@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSContactsUsageDescription</key>
 	<string>연락처에서 이름과 전화번호를 불러와 경조사 기록을 빠르게 입력하기 위해 사용합니다.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>축의금 명단이나 서명된 문서를 촬영해 이름을 인식하기 위해 사용합니다.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

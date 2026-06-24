@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../models/app_snapshot.dart';
 import '../models/occasion_record.dart';
 import '../models/person.dart';
+import '../models/person_import_draft.dart';
 import '../models/record_input.dart';
 import '../repositories/inyeon_repository.dart';
 import '../repositories/shared_preferences_inyeon_repository.dart';
@@ -119,6 +120,48 @@ class InyeonController extends StateNotifier<InyeonState> {
     await _save(AppSnapshot(people: state.people, records: records));
   }
 
+  Future<void> importPeople(
+    Iterable<PersonImportDraft> drafts, {
+    required String relationship,
+  }) async {
+    final now = DateTime.now();
+    final people = [...state.people];
+
+    for (final draft in drafts) {
+      final normalizedName = draft.name.trim();
+      if (normalizedName.isEmpty) {
+        continue;
+      }
+
+      final normalizedPhone = nullIfBlank(draft.phoneNumber);
+      final existingIndex = _findPersonImportIndex(
+        people,
+        name: normalizedName,
+        phoneNumber: normalizedPhone,
+        relationship: relationship,
+      );
+      final existingPerson =
+          existingIndex == -1 ? null : people[existingIndex];
+
+      final person = Person(
+        id: existingPerson?.id ?? _uuid.v4(),
+        name: normalizedName,
+        relationship: relationship,
+        phoneNumber: normalizedPhone ?? existingPerson?.phoneNumber,
+        memo: existingPerson?.memo,
+        createdAt: existingPerson?.createdAt ?? now,
+      );
+
+      if (existingIndex == -1) {
+        people.add(person);
+      } else {
+        people[existingIndex] = person;
+      }
+    }
+
+    await _save(AppSnapshot(people: people, records: state.records));
+  }
+
   Person? personById(String personId) {
     for (final person in state.people) {
       if (person.id == personId) {
@@ -159,6 +202,30 @@ class InyeonController extends StateNotifier<InyeonState> {
         return byId;
       }
     }
+    return people.indexWhere(
+      (person) =>
+          person.name.trim().toLowerCase() == name.toLowerCase() &&
+      person.relationship.trim() == relationship,
+    );
+  }
+
+  int _findPersonImportIndex(
+    List<Person> people, {
+    required String name,
+    required String relationship,
+    String? phoneNumber,
+  }) {
+    if (phoneNumber != null && phoneNumber.isNotEmpty) {
+      final byPhone = people.indexWhere(
+        (person) =>
+            (person.phoneNumber ?? '').replaceAll(RegExp(r'[\s-]'), '') ==
+            phoneNumber.replaceAll(RegExp(r'[\s-]'), ''),
+      );
+      if (byPhone != -1) {
+        return byPhone;
+      }
+    }
+
     return people.indexWhere(
       (person) =>
           person.name.trim().toLowerCase() == name.toLowerCase() &&

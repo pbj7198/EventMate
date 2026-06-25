@@ -45,4 +45,16 @@ void main() {
     expect(candidates[1].name, '이순자');
     expect(candidates[1].phoneNumber, '01055556666');
   });
+
+  test('normalizeSignatureSheetOcrText removes chinese-only noise', () {
+    const rawText = '''
+朴炳秀
+박병수 010-1234-5678
+''';
+
+    final normalized = normalizeSignatureSheetOcrText(rawText);
+
+    expect(normalized, isNot(contains('朴炳秀')));
+    expect(normalized, contains('박병수 010-1234-5678'));
+  });
 }

@@ -18,6 +18,16 @@ if ($LASTEXITCODE -ne 0) {
   throw "flutter pub get failed"
 }
 
+$dart = Join-Path (Split-Path $flutter -Parent) 'cache\dart-sdk\bin\dart.exe'
+if (-not (Test-Path $dart)) {
+  throw "Dart not found at $dart"
+}
+
+& $dart run tool\patch_fast_paddle_ocr_dict.dart
+if ($LASTEXITCODE -ne 0) {
+  throw "fast_paddle_ocr dictionary patch failed"
+}
+
 if ($Mode -eq 'release') {
   & $flutter build apk --release
 } else {

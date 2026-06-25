@@ -63,14 +63,14 @@ class HybridSignatureSheetScanService implements SignatureSheetScanService {
     }
 
     final rawText = await _recognizeText(file.path);
-    final trimmed = rawText.trim();
+    final normalizedText = normalizeSignatureSheetOcrText(rawText);
+    final trimmed = normalizedText.trim();
     if (trimmed.isEmpty) {
       return const SignatureSheetScanResult(
         status: SignatureSheetScanStatus.noText,
         rawText: '',
         candidates: [],
-        message:
-            '사진에서 읽을 수 있는 글자를 찾지 못했어요. 글자가 화면을 가득 채우도록 다시 찍어주세요.',
+        message: '사진에서 읽을 수 있는 글자를 찾지 못했어요. 글자가 화면을 가득 채우도록 다시 찍어주세요.',
       );
     }
 
@@ -97,10 +97,28 @@ class HybridSignatureSheetScanService implements SignatureSheetScanService {
   }
 }
 
-final signatureSheetScanServiceProvider =
-    Provider<SignatureSheetScanService>((ref) {
-      return HybridSignatureSheetScanService();
-    });
+final signatureSheetScanServiceProvider = Provider<SignatureSheetScanService>((
+  ref,
+) {
+  return HybridSignatureSheetScanService();
+});
+
+String normalizeSignatureSheetOcrText(String rawText) {
+  final normalizedLines = <String>[];
+
+  for (final line
+      in rawText
+          .split(RegExp(r'[\r\n]+'))
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)) {
+    final collapsed = line.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (_isUsefulImportLine(collapsed)) {
+      normalizedLines.add(collapsed);
+    }
+  }
+
+  return normalizedLines.join('\n');
+}
 
 List<PersonImportDraft> extractPersonImportDrafts(String rawText) {
   final lines = rawText
@@ -124,6 +142,18 @@ List<PersonImportDraft> extractPersonImportDrafts(String rawText) {
   }
 
   return candidates;
+}
+
+bool _isUsefulImportLine(String line) {
+  if (_phonePattern.hasMatch(line)) {
+    return true;
+  }
+
+  return _hangulSyllableCount(line) >= 2;
+}
+
+int _hangulSyllableCount(String line) {
+  return RegExp(r'[가-힣]').allMatches(line).length;
 }
 
 final _phonePattern = RegExp(r'(01[016789][-\s]?\d{3,4}[-\s]?\d{4})');
@@ -187,11 +217,7 @@ bool _isLikelyNameLine(String line, String? phone, List<String> tokens) {
   return tokens.length <= 3 && collapsedLength <= 12;
 }
 
-bool _isLikelyPersonContext(
-  String line,
-  String? phone,
-  Set<String> names,
-) {
+bool _isLikelyPersonContext(String line, String? phone, Set<String> names) {
   if (phone != null) {
     return true;
   }

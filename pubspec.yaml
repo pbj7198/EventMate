@@ -2,7 +2,7 @@ name: inyeon_jangbu
 description: "Local occasion ledger app"
 publish_to: 'none'
 
-version: 1.0.14+15
+version: 1.0.15+16
 
 environment:
   sdk: ^3.12.2
@@ -15,6 +15,7 @@ dependencies:
   flutter_riverpod: ^2.6.1
   flutter_contacts: ^2.2.2
   google_mlkit_text_recognition: ^0.15.1
+  image: ^4.5.4
   image_picker: ^1.1.2
   intl: ^0.20.2
   path_provider: ^2.1.5

@@ -11,6 +11,8 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'ocr_image_preprocessor.dart';
+
 abstract class SignatureSheetOcrEngine {
   Future<String> recognizeText(String imagePath);
 }
@@ -54,11 +56,15 @@ class FastPaddleSignatureSheetOcrEngine implements SignatureSheetOcrEngine {
   FastPaddleSignatureSheetOcrEngine({
     KoreanOcrModelBundle? modelBundle,
     fast_paddle_ocr.Ocr? ocr,
+    OcrImagePreprocessor? imagePreprocessor,
   }) : _modelBundle = modelBundle ?? const KoreanOcrModelBundle(),
-       _ocr = ocr ?? fast_paddle_ocr.Ocr();
+       _ocr = ocr ?? fast_paddle_ocr.Ocr(),
+       _imagePreprocessor =
+           imagePreprocessor ?? const AdaptiveOcrImagePreprocessor();
 
   final KoreanOcrModelBundle _modelBundle;
   final fast_paddle_ocr.Ocr _ocr;
+  final OcrImagePreprocessor _imagePreprocessor;
   Future<void>? _loadFuture;
 
   bool get isAndroid => Platform.isAndroid;
@@ -70,8 +76,30 @@ class FastPaddleSignatureSheetOcrEngine implements SignatureSheetOcrEngine {
     }
 
     await _ensureLoaded();
-    final text = await _ocr.ocrFromImage(imagePath);
-    return text?.trim() ?? '';
+    final imagePaths = await _imagePreprocessor.prepare(imagePath);
+    final recognizedLines = <String>[];
+    final seen = <String>{};
+
+    try {
+      for (final path in imagePaths) {
+        final text = (await _ocr.ocrFromImage(path))?.trim() ?? '';
+        for (final line in text.split(RegExp(r'[\r\n]+'))) {
+          final normalized = line.trim();
+          if (normalized.isNotEmpty && seen.add(normalized)) {
+            recognizedLines.add(normalized);
+          }
+        }
+      }
+    } finally {
+      for (final path in imagePaths.where((path) => path != imagePath)) {
+        try {
+          await File(path).delete();
+        } on FileSystemException {
+          // Temporary variants may already have been removed by the OS.
+        }
+      }
+    }
+    return recognizedLines.join('\n');
   }
 
   Future<void> _ensureLoaded() {
@@ -85,7 +113,9 @@ class FastPaddleSignatureSheetOcrEngine implements SignatureSheetOcrEngine {
       detModel: paths.detModel,
       recParam: paths.recParam,
       recModel: paths.recModel,
-      sizeid: 0,
+      // 640px detector input preserves small handwriting better than the
+      // plugin default of 320px.
+      sizeid: 4,
       cpugpu: 0,
     );
   }
@@ -183,16 +213,41 @@ class _HybridAndroidSignatureSheetOcrEngine
 
   @override
   Future<String> recognizeText(String imagePath) async {
+    final recognizedLines = <String>[];
+    final seen = <String>{};
+
     try {
       final text = await _primary.recognizeText(imagePath);
-      if (text.trim().isNotEmpty) {
-        return text;
-      }
+      _appendUniqueLines(text, recognizedLines, seen);
     } catch (error, stackTrace) {
       debugPrint('Fast Paddle OCR failed, falling back to ML Kit: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
 
-    return _fallback.recognizeText(imagePath);
+    try {
+      final text = await _fallback.recognizeText(imagePath);
+      _appendUniqueLines(text, recognizedLines, seen);
+    } catch (error, stackTrace) {
+      if (recognizedLines.isEmpty) {
+        rethrow;
+      }
+      debugPrint('ML Kit OCR failed after Paddle OCR succeeded: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+
+    return recognizedLines.join('\n');
+  }
+}
+
+void _appendUniqueLines(
+  String text,
+  List<String> output,
+  Set<String> seen,
+) {
+  for (final line in text.split(RegExp(r'[\r\n]+'))) {
+    final normalized = line.trim();
+    if (normalized.isNotEmpty && seen.add(normalized)) {
+      output.add(normalized);
+    }
   }
 }

@@ -32,6 +32,9 @@ jobs:
       - name: Pub get
         run: flutter pub get
 
+      - name: Install native OCR build tools
+        run: sdkmanager "ndk;29.0.14206865" "cmake;3.31.5"
+
       - name: Build release APK
         run: flutter build apk --release
 

@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.qkrqu.inyeon_jangbu"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "29.0.14206865"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -16,10 +16,15 @@ android {
 
     defaultConfig {
         applicationId = "com.qkrqu.inyeon_jangbu"
-        minSdk = flutter.minSdkVersion
+        // Fast Paddle OCR requires Android 7.0+ on physical ARM devices.
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
